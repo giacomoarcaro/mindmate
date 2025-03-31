@@ -22,11 +22,27 @@
   },
   "title": "Your 24/7 psychological support via WhatsApp",
   "subtitle": "Empathetic and intelligent conversations when you need them most.",
-  "cta": "Start Now",
+  "cta": "Start Your Journey",
   "questions": [
-    { "id": 1, "q": "What is your gender?", "options": ["Male", "Female", "Non-binary", "Prefer not to say"] },
-    { "id": 2, "q": "How old are you?", "input": true },
-    { "id": 3, "q": "Have you ever spoken to a psychologist or psychiatrist before?", "options": ["Yes", "No"] },
-    { "id": 4, "q": "How are you feeling today?", "options": ["Good", "So-so", "Bad", "Very bad"] }
+    {
+      "id": 1,
+      "q": "What is your gender?",
+      "options": ["Male", "Female", "Non-binary", "Prefer not to say"]
+    },
+    {
+      "id": 2,
+      "q": "How old are you?",
+      "input": true
+    },
+    {
+      "id": 3,
+      "q": "Have you ever spoken to a psychologist or psychiatrist before?",
+      "options": ["Yes", "No"]
+    },
+    {
+      "id": 4,
+      "q": "How are you feeling today?",
+      "options": ["Good", "So-so", "Bad", "Very bad"]
+    }
   ]
 } 

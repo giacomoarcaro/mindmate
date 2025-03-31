@@ -6,11 +6,16 @@ export default function Homepage() {
   const { t } = useTranslation();
   return (
     <div className="min-h-screen flex flex-col justify-center items-center bg-white px-4 text-center">
-      <h1 className="text-4xl font-bold mb-4">{t('title')}</h1>
-      <p className="text-lg mb-8">{t('subtitle')}</p>
-      <Link to="/onboarding" className="bg-blue-600 text-white px-6 py-3 rounded-xl text-lg">
-        {t('cta')}
-      </Link>
+      <div className="max-w-2xl mx-auto">
+        <h1 className="text-4xl font-bold mb-4 text-gray-900">{t('title')}</h1>
+        <p className="text-lg mb-8 text-gray-600">{t('subtitle')}</p>
+        <Link 
+          to="/onboarding" 
+          className="inline-block bg-indigo-600 text-white px-8 py-4 rounded-xl text-lg font-semibold hover:bg-indigo-700 transition-colors duration-200 shadow-lg hover:shadow-xl"
+        >
+          {t('cta')}
+        </Link>
+      </div>
     </div>
   );
 } 

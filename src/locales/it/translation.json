@@ -1,0 +1,27 @@
+{
+  "title": "Il tuo supporto psicologico 24/7 via WhatsApp",
+  "subtitle": "Conversazioni empatiche e intelligenti, quando ne hai più bisogno.",
+  "cta": "Inizia Ora",
+  "questions": [
+    {
+      "id": 1,
+      "q": "Con quale genere ti identifichi?",
+      "options": ["Uomo", "Donna", "Non binario", "Preferisco non dirlo"]
+    },
+    {
+      "id": 2,
+      "q": "Quanti anni hai?",
+      "input": true
+    },
+    {
+      "id": 3,
+      "q": "Hai mai parlato con uno psicologo o psichiatra in passato?",
+      "options": ["Sì", "No"]
+    },
+    {
+      "id": 4,
+      "q": "Come ti senti oggi?",
+      "options": ["Bene", "Così così", "Male", "Molto male"]
+    }
+  ]
+} 

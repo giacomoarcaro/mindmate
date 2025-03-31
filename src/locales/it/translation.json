@@ -1,27 +1,23 @@
 {
-  "title": "Il tuo supporto psicologico 24/7 via WhatsApp",
-  "subtitle": "Conversazioni empatiche e intelligenti, quando ne hai più bisogno.",
-  "cta": "Inizia Ora",
-  "questions": [
-    {
-      "id": 1,
-      "q": "Con quale genere ti identifichi?",
-      "options": ["Uomo", "Donna", "Non binario", "Preferisco non dirlo"]
-    },
-    {
-      "id": 2,
-      "q": "Quanti anni hai?",
-      "input": true
-    },
-    {
-      "id": 3,
-      "q": "Hai mai parlato con uno psicologo o psichiatra in passato?",
-      "options": ["Sì", "No"]
-    },
-    {
-      "id": 4,
-      "q": "Come ti senti oggi?",
-      "options": ["Bene", "Così così", "Male", "Molto male"]
-    }
-  ]
+  "welcome": "Benvenuto in MindMate AI",
+  "start": "Inizia il Tuo Percorso",
+  "onboarding": {
+    "title": "Conosciamoci Meglio",
+    "name": "Come ti chiami?",
+    "age": "Quanti anni hai?",
+    "concerns": "Cosa ti porta qui oggi?",
+    "goals": "Cosa vorresti ottenere?",
+    "preferences": "Preferisci una guida strutturata o un supporto più libero?"
+  },
+  "chat": {
+    "start": "Inizia a Chattare",
+    "connecting": "Connessione a WhatsApp...",
+    "connected": "Connesso! Ora puoi chattare con il tuo assistente AI su WhatsApp"
+  },
+  "common": {
+    "next": "Avanti",
+    "back": "Indietro",
+    "submit": "Invia",
+    "loading": "Caricamento..."
+  }
 } 

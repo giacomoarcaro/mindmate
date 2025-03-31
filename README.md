@@ -1,72 +1,119 @@
-# MindMate - Multilingual Psychological Support
+# MindMate AI - Assistente psicologico AI via WhatsApp
 
-A React application that provides 24/7 psychological support via WhatsApp, with automatic language detection and a smooth onboarding process.
+Un assistente psicologico multilingua che utilizza AI per fornire supporto emotivo via WhatsApp.
 
-## Features
+## 🏗️ Architettura
 
-- 🌐 Automatic language detection (English/Italian)
-- 📱 WhatsApp integration
-- 🎨 Modern UI with Tailwind CSS
-- 📝 Dynamic onboarding questionnaire
-- 🔄 Real-time progress tracking
+- **Frontend**: React + Tailwind + i18next (multilingua)
+- **Backend**: Node.js + Express
+- **Database**: Supabase
+- **Integrazione**: WhatsApp (Twilio) + GPT-4 Turbo
+- **Deploy**: Frontend su Vercel, Backend su Railway/Docker
 
-## Prerequisites
+## 📁 Struttura del Progetto
 
-- Node.js (v14 or higher)
-- npm or yarn
-- Twilio account with WhatsApp capabilities
-- Environment variables for Twilio credentials
-
-## Setup
-
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd mindmate
+```
+mindmate/
+├── frontend/           # React frontend
+├── backend/           # Express backend
+├── docker/           # Configurazioni Docker
+├── locales/          # Traduzioni i18n
+├── gpt/              # System prompt GPT
+└── vercel.json       # Configurazione Vercel
 ```
 
-2. Install dependencies:
+## 🚀 Deploy
+
+### Frontend (Vercel)
+
+1. Installa Vercel CLI:
 ```bash
+npm install -g vercel
+```
+
+2. Deploy:
+```bash
+cd frontend
+vercel --prod
+```
+
+### Backend (Railway/Docker)
+
+#### Railway
+```bash
+cd backend
+railway up
+```
+
+#### Docker
+```bash
+cd docker
+docker-compose up -d
+```
+
+## 🔐 Variabili d'Ambiente
+
+### Frontend (.env)
+```
+REACT_APP_SUPABASE_URL=your_supabase_url
+REACT_APP_SUPABASE_ANON_KEY=your_supabase_key
+REACT_APP_API_URL=your_backend_url
+```
+
+### Backend (.env)
+```
+SUPABASE_URL=your_supabase_url
+SUPABASE_KEY=your_supabase_key
+TWILIO_SID=your_twilio_sid
+TWILIO_AUTH_TOKEN=your_twilio_token
+TWILIO_NUMBER=your_twilio_number
+OPENAI_API_KEY=your_openai_key
+```
+
+## 🧪 Test Locale
+
+1. Frontend:
+```bash
+cd frontend
 npm install
-```
-
-3. Create a `.env` file in the root directory:
-```env
-TWILIO_ACCOUNT_SID=your_account_sid
-TWILIO_AUTH_TOKEN=your_auth_token
-```
-
-4. Start the development server:
-```bash
 npm start
 ```
 
-5. In a separate terminal, start the backend server:
+2. Backend:
 ```bash
-node server.js
+cd backend
+npm install
+npm run dev
 ```
 
-## Environment Variables
+## 📱 Funzionalità
 
-- `TWILIO_ACCOUNT_SID`: Your Twilio Account SID
-- `TWILIO_AUTH_TOKEN`: Your Twilio Auth Token
+- Onboarding multilingua (IT/EN)
+- Rilevamento automatico lingua
+- Integrazione WhatsApp
+- Risposte AI personalizzate
+- Monitoraggio utenti via Supabase
+- Interfaccia moderna con Tailwind CSS
 
-## Usage
+## 🤖 GPT System Prompt
 
-1. Visit `http://localhost:3000` in your browser
-2. The application will automatically detect your language
-3. Click "Start Now" to begin the onboarding process
-4. Answer the questions to complete the onboarding
-5. You'll be redirected to WhatsApp to continue the conversation
+Il sistema utilizza GPT-4 Turbo con un prompt personalizzato per:
+- Adattare il tono alla lingua dell'utente
+- Personalizzare le risposte in base all'onboarding
+- Selezionare il modello terapeutico appropriato
+- Mantenere un approccio empatico e non diagnostico
 
-## Contributing
+## 📝 Note di Sviluppo
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+- Il frontend è configurato per Vercel con routing SPA
+- Il backend è containerizzato per facile deploy
+- Le traduzioni sono gestite via i18next
+- Il database è strutturato per scalabilità
 
-## License
+## 🔒 Sicurezza
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+- Variabili d'ambiente protette
+- Row Level Security su Supabase
+- Validazione input utente
+- Rate limiting API
+- Sanitizzazione risposte GPT 

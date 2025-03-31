@@ -7,7 +7,48 @@
     "age": "How old are you?",
     "concerns": "What brings you here today?",
     "goals": "What would you like to achieve?",
-    "preferences": "Do you prefer structured guidance or more open-ended support?"
+    "preferences": "Do you prefer structured guidance or more open-ended support?",
+    "questions": [
+      {
+        "id": "name",
+        "text": "What's your name?",
+        "type": "text",
+        "placeholder": "Enter your name"
+      },
+      {
+        "id": "age",
+        "text": "How old are you?",
+        "type": "number",
+        "placeholder": "Enter your age"
+      },
+      {
+        "id": "concern",
+        "text": "What's your main concern?",
+        "type": "select",
+        "options": [
+          "Anxiety",
+          "Depression",
+          "Stress",
+          "Relationship issues",
+          "Personal growth",
+          "Other"
+        ]
+      },
+      {
+        "id": "frequency",
+        "text": "How often would you like to chat?",
+        "type": "select",
+        "options": [
+          "Daily",
+          "Weekly",
+          "As needed"
+        ]
+      }
+    ],
+    "buttons": {
+      "next": "Next",
+      "submit": "Start Chatting"
+    }
   },
   "chat": {
     "start": "Start Chatting",
@@ -44,5 +85,10 @@
       "q": "How are you feeling today?",
       "options": ["Good", "So-so", "Bad", "Very bad"]
     }
-  ]
+  ],
+  "homepage": {
+    "title": "Your 24/7 psychological support via WhatsApp",
+    "subtitle": "Empathetic and intelligent conversations when you need them most",
+    "cta": "Start Your Journey"
+  }
 } 

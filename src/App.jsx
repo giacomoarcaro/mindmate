@@ -1,10 +1,10 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Homepage from './components/Homepage';
-import Onboarding from './components/Onboarding';
+import Homepage from './pages/Homepage';
+import Onboarding from './pages/Onboarding';
 import './i18n';
 
-function App() {
+const App = () => {
   return (
     <Router>
       <Routes>
@@ -13,6 +13,6 @@ function App() {
       </Routes>
     </Router>
   );
-}
+};
 
 export default App; 

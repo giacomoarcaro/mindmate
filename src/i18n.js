@@ -6,7 +6,9 @@ import translationEN from './locales/en/translation.json';
 import translationIT from './locales/it/translation.json';
 
 const resources = {
-  en: { translation: translationEN },
+  en: {
+    translation: translationEN
+  },
   it: { translation: translationIT },
 };
 
@@ -16,7 +18,9 @@ i18n
   .init({
     resources,
     fallbackLng: 'en',
-    interpolation: { escapeValue: false },
+    interpolation: {
+      escapeValue: false
+    }
   });
 
 export default i18n; 

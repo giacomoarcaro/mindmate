@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 
 const Onboarding = () => {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState({});
+  const [currentInput, setCurrentInput] = useState('');
   const questions = t('onboarding.questions', { returnObjects: true });
 
   const handleAnswer = (value) => {
@@ -18,12 +17,26 @@ const Onboarding = () => {
 
     if (step < questions.length - 1) {
       setStep(prev => prev + 1);
+      setCurrentInput('');
+    } else {
+      handleSubmit();
+    }
+  };
+
+  const handleInputChange = (e) => {
+    setCurrentInput(e.target.value);
+  };
+
+  const handleInputSubmit = () => {
+    if (currentInput.trim()) {
+      handleAnswer(currentInput);
     }
   };
 
   const handleSubmit = async () => {
     try {
-      const response = await fetch('/api/start', {
+      console.log('Submitting answers:', answers); // Debug log
+      const response = await fetch('http://localhost:5000/api/start', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -35,11 +48,15 @@ const Onboarding = () => {
         throw new Error('Failed to submit form');
       }
 
+      const data = await response.json();
+      console.log('Response:', data); // Debug log
+
       // Redirect to WhatsApp
-      window.location.href = 'https://wa.me/1234567890';
+      window.location.href = data.whatsappLink || 'https://wa.me/1234567890';
     } catch (error) {
       console.error('Error submitting form:', error);
-      // Handle error appropriately
+      // For development, redirect even if there's an error
+      window.location.href = 'https://wa.me/1234567890';
     }
   };
 
@@ -84,12 +101,14 @@ const Onboarding = () => {
             <div className="space-y-4">
               <input
                 type={currentQuestion.type}
+                value={currentInput}
+                onChange={handleInputChange}
+                onKeyPress={(e) => e.key === 'Enter' && handleInputSubmit()}
                 placeholder={currentQuestion.placeholder}
-                onChange={(e) => handleAnswer(e.target.value)}
                 className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               />
               <button
-                onClick={() => handleAnswer(answers[currentQuestion.id] || '')}
+                onClick={handleInputSubmit}
                 className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200"
               >
                 {step === questions.length - 1 ? t('onboarding.buttons.submit') : t('onboarding.buttons.next')}

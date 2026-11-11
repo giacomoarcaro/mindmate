@@ -87,7 +87,7 @@ export class World {
     const want = this.wanted(x, y, LOAD_RADIUS);
     this.queue = want.filter((k) => !this.tiles.has(k));
     const t0 = performance.now();
-    while (this.queue.length && performance.now() - t0 < budgetMs) this.loadTile(this.queue.shift()!);
+    while (this.queue.length && performance.now() - t0 < budgetMs) this.loadTileNow(this.queue.shift()!);
 
     const cx = this.grid.tx(x), cy = this.grid.ty(y);
     for (const [k, t] of this.tiles) {
@@ -101,13 +101,14 @@ export class World {
 
   /** Synchronously loads every tile around a point (used at spawn). */
   preload(x: number, y: number, radius = LOAD_RADIUS) {
-    for (const k of this.wanted(x, y, radius)) if (!this.tiles.has(k)) this.loadTile(k);
+    for (const k of this.wanted(x, y, radius)) if (!this.tiles.has(k)) this.loadTileNow(k);
     this.update(x, y, 0);
   }
 
   pendingTiles() { return this.queue.length; }
 
-  private loadTile(key: number) {
+  loadTileNow(key: number) {
+    if (this.tiles.has(key)) return;
     const [ox, oy] = this.grid.origin(key);
     const group = new THREE.Group();
     group.name = `tile-${key}`;

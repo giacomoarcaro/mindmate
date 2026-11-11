@@ -1,0 +1,57 @@
+import * as THREE from 'three';
+import type { CarSpec } from './vehicle';
+
+export const JEEP: CarSpec = {
+  name: 'Jeep 4x4',
+  mass: 1500,
+  halfExtents: [0.9, 0.42, 2.15],
+  colliderOffset: [0, 0.78, -0.15],
+  com: [0, 0.15, -0.1],
+  inertia: [2400, 2700, 1100],
+  wheels: [
+    { pos: [-0.83, 0.75, -1.45], steer: true, drive: true, rear: false },
+    { pos: [0.83, 0.75, -1.45], steer: true, drive: true, rear: false },
+    { pos: [-0.83, 0.75, 1.2], steer: false, drive: true, rear: true },
+    { pos: [0.83, 0.75, 1.2], steer: false, drive: true, rear: true },
+  ],
+  wheelRadius: 0.42,
+  suspensionRest: 0.42,
+  suspensionTravel: 0.3,
+  stiffness: 30,
+  compression: 2.6,
+  relaxation: 3.4,
+  friction: 2.0,
+  engineForce: 8500,
+  reverseForce: 3500,
+  brakeForce: 600,
+  maxSteer: 0.55,
+  maxKmh: 140,
+  camera: { chaseDist: 7.5, chaseHeight: 2.9, hood: new THREE.Vector3(0, 1.75, -0.95) },
+};
+
+export const MOTOTAXI: CarSpec = {
+  name: 'Mototaxi',
+  mass: 380,
+  halfExtents: [0.62, 0.45, 1.3],
+  colliderOffset: [0, 0.85, 0],
+  com: [0, 0.2, 0.2],
+  inertia: [320, 300, 300],
+  wheels: [
+    { pos: [0, 0.62, -1.3], steer: true, drive: false, rear: false },
+    { pos: [-0.56, 0.62, 0.55], steer: false, drive: true, rear: true },
+    { pos: [0.56, 0.62, 0.55], steer: false, drive: true, rear: true },
+  ],
+  wheelRadius: 0.3,
+  suspensionRest: 0.32,
+  suspensionTravel: 0.2,
+  stiffness: 34,
+  compression: 2.6,
+  relaxation: 3.4,
+  friction: 2.0,
+  engineForce: 1700,
+  reverseForce: 800,
+  brakeForce: 160,
+  maxSteer: 0.6,
+  maxKmh: 65,
+  camera: { chaseDist: 6, chaseHeight: 2.5, hood: new THREE.Vector3(0, 1.55, -0.35) },
+};

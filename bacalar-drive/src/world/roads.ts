@@ -53,11 +53,8 @@ export class RoadNetwork {
       for (let i = 0; i < pts.length; i += 2) {
         const [dx, dy] = dirAt(pts, i / 2);
         const x = pts[i], y = pts[i + 1];
-        let h = Math.max(
-          field.heightAt(x, y),
-          field.heightAt(x - dy * hw, y + dx * hw),
-          field.heightAt(x + dy * hw, y - dx * hw),
-        ) + lift;
+        void dx; void dy; void hw;
+        let h = field.heightAt(x, y) + lift;
         if (r.bridge || field.shoreDist(x, y) < 0) h = Math.max(h, 1.6 + lift);
         hs.push(h);
       }
@@ -93,12 +90,24 @@ export class RoadNetwork {
     return r.paved ? 'asphalt' : 'dirt';
   }
 
+  /** Surface height at an arbitrary point of a road: terrain + lift (bridges stay above water). */
+  private hAt(r: Road, x: number, y: number) {
+    let h = this.field.heightAt(x, y) + (LIFT[r.cls] ?? 0.1);
+    if (r.bridge || this.field.shoreDist(x, y) < 0) h = Math.max(h, 1.6 + (LIFT[r.cls] ?? 0.1));
+    return h;
+  }
+
   private buildRibbon(info: RoadInfo) {
     const { pts, hs, src } = info;
     const mat = this.material(src);
     const n = pts.length / 2;
     const w = src.width;
     const side = offsetLines(pts, w / 2);
+    const edgeL: number[] = [], edgeR: number[] = [];
+    for (let i = 0; i < n; i++) {
+      edgeL.push(this.hAt(src, side.lx[i], side.ly[i]));
+      edgeR.push(this.hAt(src, side.rx[i], side.ry[i]));
+    }
 
     let dist = 0;
     for (let i = 0; i < n - 1; i++) {
@@ -107,8 +116,8 @@ export class RoadNetwork {
       const b = this.bufs(this.grid.keyAt(mx, my));
       const v0 = dist / w, v1 = (dist + segLen) / w;
       quad(b.pos[mat], b.uv[mat],
-        side.lx[i], side.ly[i], hs[i], side.rx[i], side.ry[i], hs[i],
-        side.lx[i + 1], side.ly[i + 1], hs[i + 1], side.rx[i + 1], side.ry[i + 1], hs[i + 1],
+        side.lx[i], side.ly[i], edgeL[i], side.rx[i], side.ry[i], edgeR[i],
+        side.lx[i + 1], side.ly[i + 1], edgeL[i + 1], side.rx[i + 1], side.ry[i + 1], edgeR[i + 1],
         v0, v1);
       dist += segLen;
     }
@@ -123,7 +132,7 @@ export class RoadNetwork {
   }
 
   private buildMarkings(info: RoadInfo) {
-    const { pts, hs, src } = info;
+    const { pts, src } = info;
     const n = pts.length / 2;
     const lineW = 0.15;
     const edge = src.width / 2 - 0.35;
@@ -144,9 +153,10 @@ export class RoadNetwork {
         if (dashOn && !nearEnd) {
           const mx = (pts[2 * i] + pts[2 * i + 2]) / 2, my = (pts[2 * i + 1] + pts[2 * i + 3]) / 2;
           const b = this.bufs(this.grid.keyAt(mx, my));
+          const m = (x: number, y: number) => this.hAt(src, x, y) + 0.02;
           quad(b.pos.marking, b.uv.marking,
-            a.lx[i], a.ly[i], hs[i] + 0.02, a.rx[i], a.ry[i], hs[i] + 0.02,
-            a.lx[i + 1], a.ly[i + 1], hs[i + 1] + 0.02, a.rx[i + 1], a.ry[i + 1], hs[i + 1] + 0.02,
+            a.lx[i], a.ly[i], m(a.lx[i], a.ly[i]), a.rx[i], a.ry[i], m(a.rx[i], a.ry[i]),
+            a.lx[i + 1], a.ly[i + 1], m(a.lx[i + 1], a.ly[i + 1]), a.rx[i + 1], a.ry[i + 1], m(a.rx[i + 1], a.ry[i + 1]),
             0, 1);
         }
         dist += segLen;

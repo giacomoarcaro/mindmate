@@ -35,36 +35,36 @@ function jitter(g: THREE.BufferGeometry, amount: number, seed: number) {
 }
 
 function broadleaf(lod: number) {
-  const trunk = colored(new THREE.CylinderGeometry(0.16, 0.28, 3.4, lod ? 4 : 6).translate(0, 1.7, 0), '#6b5236');
+  const trunk = colored(new THREE.CylinderGeometry(0.16, 0.28, 3.4, lod ? 3 : 5, 1, true).translate(0, 1.7, 0), '#6b5236');
   if (lod) {
     const crown = colored(new THREE.OctahedronGeometry(2.4).scale(1, 0.8, 1).translate(0, 4.4, 0), '#4f7d2d');
     return mergeGeometries([trunk, crown]);
   }
-  const c1 = colored(jitter(new THREE.IcosahedronGeometry(2.3, 1), 0.5, 1).scale(1, 0.8, 1).translate(0, 4.4, 0), '#4f7d2d');
+  const c1 = colored(jitter(new THREE.IcosahedronGeometry(2.3, 0), 0.5, 1).scale(1, 0.8, 1).translate(0, 4.4, 0), '#4f7d2d');
   const c2 = colored(jitter(new THREE.IcosahedronGeometry(1.5, 0), 0.4, 2).translate(0.9, 5.4, 0.4), '#5d8c33');
   return mergeGeometries([trunk, c1, c2]);
 }
 
 function tallTree(lod: number) {
-  const trunk = colored(new THREE.CylinderGeometry(0.25, 0.45, 8, lod ? 4 : 6).translate(0, 4, 0), '#7a6448');
+  const trunk = colored(new THREE.CylinderGeometry(0.25, 0.45, 8, lod ? 3 : 5, 1, true).translate(0, 4, 0), '#7a6448');
   if (lod) {
     const crown = colored(new THREE.OctahedronGeometry(3.6).scale(1.2, 0.5, 1.2).translate(0, 8.6, 0), '#41692a');
     return mergeGeometries([trunk, crown]);
   }
-  const c1 = colored(jitter(new THREE.IcosahedronGeometry(3.4, 1), 0.7, 3).scale(1.3, 0.55, 1.3).translate(0, 8.6, 0), '#41692a');
+  const c1 = colored(jitter(new THREE.IcosahedronGeometry(3.4, 0), 0.7, 3).scale(1.3, 0.55, 1.3).translate(0, 8.6, 0), '#41692a');
   const c2 = colored(jitter(new THREE.IcosahedronGeometry(2.2, 0), 0.5, 4).scale(1.2, 0.6, 1.2).translate(-1.5, 7.6, 1.2), '#4c7a2e');
   return mergeGeometries([trunk, c1, c2]);
 }
 
 function palm(lod: number) {
   const parts: THREE.BufferGeometry[] = [];
-  const segs = lod ? 2 : 5;
+  const segs = lod ? 1 : 4;
   const height = 7;
   // gently curved trunk
   for (let s = 0; s < segs; s++) {
     const y0 = (s / segs) * height, y1 = ((s + 1) / segs) * height;
     const bend = (y: number) => (y / height) ** 2 * 1.2;
-    const g = new THREE.CylinderGeometry(0.17, 0.22, y1 - y0, lod ? 4 : 6, 1, true);
+    const g = new THREE.CylinderGeometry(0.17, 0.22, y1 - y0, lod ? 3 : 5, 1, true);
     g.translate(0, (y0 + y1) / 2, 0);
     const p = g.getAttribute('position');
     for (let i = 0; i < p.count; i++) p.setX(i, p.getX(i) + bend(p.getY(i)));
@@ -177,10 +177,18 @@ export class Vegetation implements TileLayer {
       }
     }
 
+    // shuffle so that drawing only the first N instances thins the forest evenly (far LOD)
+    for (const L of lists) {
+      const n6 = L.length / 6;
+      for (let i = n6 - 1; i > 0; i--) {
+        const j = Math.floor(r() * (i + 1));
+        for (let k = 0; k < 6; k++) { const t = L[i * 6 + k]; L[i * 6 + k] = L[j * 6 + k]; L[j * 6 + k] = t; }
+      }
+    }
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3();
     const up = new THREE.Vector3(0, 1, 0);
     const col = new THREE.Color();
-    const meshes: THREE.InstancedMesh[][] = [];
+    const meshes: { near: THREE.InstancedMesh; far: THREE.InstancedMesh; total: number; bush: boolean }[] = [];
     this.species.forEach((s, si) => {
       const L = lists[si];
       const count = L.length / 6;
@@ -208,14 +216,19 @@ export class Vegetation implements TileLayer {
       near.visible = tile.lod === 0;
       far.visible = tile.lod !== 0;
       tile.group.add(near, far);
-      meshes.push([near, far]);
+      meshes.push({ near, far, total: count, bush: s.name === 'bush' });
     });
-    const prev = tile.setLod;
-    tile.setLod = (lod) => {
-      prev?.(lod);
-      for (const [near, far] of meshes) { near.visible = lod === 0; far.visible = lod !== 0; }
+    const apply = (lod: number) => {
+      for (const o of meshes) {
+        o.near.visible = lod === 0;
+        o.far.visible = lod !== 0 && !(lod === 2 && o.bush);
+        o.far.count = lod === 2 ? Math.ceil(o.total * 0.5) : o.total;
+      }
     };
+    apply(tile.lod);
+    const prev = tile.setLod;
+    tile.setLod = (lod) => { prev?.(lod); apply(lod); };
     const prevDispose = tile.dispose;
-    tile.dispose = () => { prevDispose(); for (const [near] of meshes) near.dispose(); };
+    tile.dispose = () => { prevDispose(); for (const o of meshes) o.near.dispose(); };
   }
 }

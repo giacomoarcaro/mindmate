@@ -332,7 +332,10 @@ async function main() {
         [x, y] = proj.toLocal(g.reduce((s, p) => s + p.lat, 0) / g.length, g.reduce((s, p) => s + p.lon, 0) / g.length);
       } else continue;
       const kind = t.historic ? `historic:${t.historic}` : t.tourism ? `tourism:${t.tourism}` : t.place ? `place:${t.place}` : `amenity:${t.amenity}`;
-      (t.historic || t.place ? landmarks : pois).push({ name: t.name, kind, x: r1(x), y: r1(y) });
+      const poi: Poi = { name: t.name, kind, x: r1(x), y: r1(y) };
+      // keep outlines of historic sites (used to orient and size the fort model)
+      if (t.historic && e.type === 'way' && e.geometry && e.geometry.length >= 4) poi.ring = openRing(toFlat(e.geometry));
+      (t.historic || t.place ? landmarks : pois).push(poi);
     }
   }
 

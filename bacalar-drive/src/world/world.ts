@@ -46,9 +46,13 @@ export class World {
   onTileUnloaded?: (t: Tile) => void;
   private queue: number[] = [];
 
-  constructor(readonly data: MapData) {
+  loadRadius = LOAD_RADIUS;
+
+  /** `prepare` runs after the raster fields exist and before roads sample terrain heights. */
+  constructor(readonly data: MapData, prepare?: (field: Field) => void) {
     const b = data.meta.bounds;
     this.field = new Field(data);
+    prepare?.(this.field);
     this.grid = new TileGrid(b.minX, b.minY, b.maxX, b.maxY);
     this.roads = new RoadNetwork(data, this.field, this.grid);
 
@@ -84,7 +88,7 @@ export class World {
 
   /** Call every frame with the focus position (map coords). Builds tiles within a time budget. */
   update(x: number, y: number, budgetMs = 6) {
-    const want = this.wanted(x, y, LOAD_RADIUS);
+    const want = this.wanted(x, y, this.loadRadius);
     this.queue = want.filter((k) => !this.tiles.has(k));
     const t0 = performance.now();
     while (this.queue.length && performance.now() - t0 < budgetMs) this.loadTileNow(this.queue.shift()!);
@@ -93,22 +97,26 @@ export class World {
     for (const [k, t] of this.tiles) {
       const [i, j] = this.grid.coords(k);
       const cheb = Math.max(Math.abs(i - cx), Math.abs(j - cy));
-      if (cheb > UNLOAD_RADIUS) { this.unloadTile(t); continue; }
-      const lod = cheb <= 1 ? 0 : 1;
+      if (cheb > Math.max(UNLOAD_RADIUS, this.loadRadius + 1)) { this.unloadTile(t); continue; }
+      const lod = cheb <= 1 ? 0 : cheb === 2 ? 1 : 2;
       if (lod !== t.lod) { t.lod = lod; t.setLod?.(lod); }
     }
   }
 
   /** Synchronously loads every tile around a point (used at spawn). */
-  preload(x: number, y: number, radius = LOAD_RADIUS) {
+  preload(x: number, y: number, radius = this.loadRadius) {
     for (const k of this.wanted(x, y, radius)) if (!this.tiles.has(k)) this.loadTileNow(k);
     this.update(x, y, 0);
   }
 
   pendingTiles() { return this.queue.length; }
 
+  /** build time stats (ms) for the performance overlay */
+  readonly stats = { tiles: 0, totalMs: 0, maxMs: 0 };
+
   loadTileNow(key: number) {
     if (this.tiles.has(key)) return;
+    const tStart = performance.now();
     const [ox, oy] = this.grid.origin(key);
     const group = new THREE.Group();
     group.name = `tile-${key}`;
@@ -165,6 +173,10 @@ export class World {
     this.root.add(group);
     this.tiles.set(key, tile);
     this.onTileLoaded?.(tile);
+    const ms = performance.now() - tStart;
+    this.stats.tiles++;
+    this.stats.totalMs += ms;
+    this.stats.maxMs = Math.max(this.stats.maxMs, ms);
   }
 
   private unloadTile(t: Tile) {

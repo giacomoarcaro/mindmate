@@ -19,6 +19,9 @@ import { Atmosphere } from './env/atmosphere';
 import { StreetLights } from './world/streetlights';
 import { Minimap } from './ui/minimap';
 import type { Poi } from './data/types';
+import { Landmarks } from './world/landmarks';
+import { PierLayer } from './world/piers';
+import { Rain } from './env/rain';
 
 type Progress = (msg: string) => Promise<void>;
 
@@ -43,6 +46,10 @@ export class Game {
   atmosphere!: Atmosphere;
   streetLights!: StreetLights;
   minimap!: Minimap;
+  landmarks!: Landmarks;
+  rain = new Rain();
+  readonly lowQuality = /[?&]low\b/.test(location.search);
+  private minimapTimer = 0;
   headlight = new THREE.SpotLight(0xfff1d0, 0, 90, 0.55, 0.5, 1.2);
   private namedPoints: Poi[] = [];
   private lastPoi: Poi | null = null;
@@ -58,7 +65,7 @@ export class Game {
 
   constructor(readonly canvas: HTMLCanvasElement, readonly data: MapData) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, /[?&]low\b/.test(location.search) ? 1 : 1.5));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -73,18 +80,25 @@ export class Game {
 
   async init(progress: Progress) {
     await progress('Rasterizing lagoon and terrain…');
-    this.world = new World(this.data);
+    this.landmarks = new Landmarks(this.data);
+    this.world = new World(this.data, (field) => this.landmarks.registerModifiers(field));
+    if (this.lowQuality) this.world.loadRadius = 2;
     this.scene.add(this.world.root);
+    this.landmarks.markOccupied(this.world.field);
     await progress('Placing buildings and houses…');
     const w = this.world;
-    this.buildings = new BuildingSet(this.data, w.field, w.roads, w.grid, [{ x: 0, y: 0, r: 75 }]);
+    this.buildings = new BuildingSet(this.data, w.field, w.roads, w.grid, this.landmarks.exclusions());
     this.vegetation = new Vegetation(w.field);
     this.streetLights = new StreetLights(w.roads, w.field, w.grid);
-    w.layers.push(this.buildings, this.vegetation, this.streetLights, new WaterWalls(this.data, w.field, w.roads, w.grid));
+    w.layers.push(this.buildings, this.vegetation, this.streetLights, new PierLayer(this.data, w.field, w.grid), new WaterWalls(this.data, w.field, w.roads, w.grid));
+    await progress('Building Fuerte de San Felipe and the plaza…');
+    this.landmarks.build(this.vegetation.species[2].geo[0], this.vegetation.material);
+    this.scene.add(this.landmarks.group, this.rain.mesh);
     this.water = buildWater(w.field);
     this.scene.add(this.water.mesh);
     await progress('Starting physics…');
     this.physics = await Physics.create(w);
+    this.physics.addStatic(this.landmarks.colliders, this.landmarks.boxes);
     this.hud = new Hud();
     this.player = new Player(this.physics, w, this.hud);
     this.scene.add(this.player.root);
@@ -116,7 +130,7 @@ export class Game {
 
     this.scene.fog = new THREE.Fog(0xb9d9e8, 400, 1100);
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(2048, 2048);
+    this.sun.shadow.mapSize.set(this.lowQuality ? 1024 : 2048, this.lowQuality ? 1024 : 2048);
     const sc = this.sun.shadow.camera;
     sc.left = -120; sc.right = 120; sc.top = 120; sc.bottom = -120; sc.near = 1; sc.far = 800;
     this.sun.shadow.bias = -0.0004;
@@ -311,6 +325,12 @@ export class Game {
     this.vegetation.time.value = this.elapsed;
     this.streetLights.setNight(atm.night);
     this.buildings.setNight(atm.night);
+    this.rain.update(this.elapsed, cam, atm.rain);
+    const wet = 1 - atm.rain * 0.35;
+    (this.world.materials.asphalt as THREE.MeshLambertMaterial).color.setScalar(wet);
+    (this.world.materials.dirt as THREE.MeshLambertMaterial).color.setScalar(1 - atm.rain * 0.25);
+    const flag = this.landmarks.group.getObjectByName('flag');
+    if (flag) flag.rotation.y = Math.sin(this.elapsed * 1.7) * 0.25;
     const lightsOn = atm.night > 0.35 || atm.rain > 0.5;
     for (const v of p.vehicles) v.setLights(lightsOn && v === p.active);
     if (p.active && lightsOn) {
@@ -328,7 +348,11 @@ export class Game {
     }
     const mapPos = this.droneActive ? { x: cam.x, y: -cam.z } : focus;
     const mapHeading = this.droneActive ? -this.drone.yaw : p.heading();
-    this.minimap.draw(mapPos.x, mapPos.y, mapHeading);
+    this.minimapTimer -= dt;
+    if (this.minimapTimer <= 0) {
+      this.minimapTimer = 1 / 30;
+      this.minimap.draw(mapPos.x, mapPos.y, mapHeading);
+    }
     if (p.active) {
       this.hud.showSpeedo(true);
       this.hud.drawSpeed(p.active.forwardSpeed() * 3.6, p.active.maxKmh, p.active.name);

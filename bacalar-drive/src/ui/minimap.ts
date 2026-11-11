@@ -70,7 +70,11 @@ export class Minimap {
     const f = this.field;
     c.imageSmoothingEnabled = true;
     const px = (x - f.minX) / CELL, py = (f.ny - 1) - (y - f.minY) / CELL;
-    c.drawImage(this.base, -px * CELL * s, -py * CELL * s, f.nx * CELL * s, f.ny * CELL * s);
+    // only the part of the raster around the player
+    const half = Math.ceil((this.range * 1.5) / CELL);
+    const sx0 = Math.max(0, Math.floor(px - half)), sy0 = Math.max(0, Math.floor(py - half));
+    const sw = Math.min(f.nx - sx0, half * 2), sh = Math.min(f.ny - sy0, half * 2);
+    if (sw > 0 && sh > 0) c.drawImage(this.base, sx0, sy0, sw, sh, (sx0 - px) * CELL * s, (sy0 - py) * CELL * s, sw * CELL * s, sh * CELL * s);
 
     // buildings
     c.fillStyle = 'rgba(235, 225, 210, 0.9)';

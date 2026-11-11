@@ -55,6 +55,19 @@ export class Physics {
     for (const k of [...this.tileColliders.keys()]) if (!keep.has(k)) this.removeTile(k);
   }
 
+  /** Permanent static geometry (landmarks). */
+  addStatic(meshes: { positions: Float32Array; indices: Uint32Array }[], boxes: { x: number; y: number; z: number; hx: number; hy: number; hz: number; yaw: number }[]) {
+    const body = this.rw.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+    for (const m of meshes) {
+      this.rw.createCollider(RAPIER.ColliderDesc.trimesh(m.positions, m.indices).setCollisionGroups(groups(GROUP_STATIC, 0xffff)), body);
+    }
+    for (const b of boxes) {
+      this.rw.createCollider(RAPIER.ColliderDesc.cuboid(b.hx, b.hy, b.hz).setTranslation(b.x, b.y, b.z)
+        .setRotation({ x: 0, y: Math.sin(b.yaw / 2), z: 0, w: Math.cos(b.yaw / 2) })
+        .setCollisionGroups(groups(GROUP_STATIC, 0xffff)), body);
+    }
+  }
+
   hasColliderAt(x: number, y: number) {
     return this.tileColliders.has(this.world.grid.keyAt(x, y));
   }

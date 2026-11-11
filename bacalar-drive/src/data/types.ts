@@ -47,6 +47,8 @@ export interface Poi {
   kind: string;
   x: number;
   y: number;
+  /** outline for historic sites */
+  ring?: number[];
 }
 
 export interface MapData {

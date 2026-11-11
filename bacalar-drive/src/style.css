@@ -29,3 +29,29 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0d2b3a; fon
 .message { position: absolute; left: 50%; top: 60%; transform: translateX(-50%); font-size: 15px; opacity: 0; transition: opacity 0.4s; }
 .message.show { opacity: 1; }
 .minimap:empty { display: none; }
+
+/* Bacalar Jungle Gym theme */
+:root { --lime: #b4e23c; --pink: #ff5fa2; --gold: #ffd23f; --charcoal: #20252a; }
+#loading { background: radial-gradient(circle at 50% 35%, #2b5d3a 0%, #17352b 45%, #20252a 100%); }
+#loading .title { color: var(--lime); font-size: 64px; text-shadow: 0 5px 0 #ff9a5c, 0 10px 30px rgba(0,0,0,0.5); text-align: center; }
+#loading .sub { background: var(--charcoal); color: var(--lime); padding: 6px 18px; border-radius: 999px; font-weight: 800; margin-top: 14px; }
+.brand { position: absolute; left: 12px; top: 12px; display: flex; gap: 10px; align-items: center; border: 2px solid var(--lime); }
+.brand img { width: 58px; height: 58px; }
+.brand-name { font-weight: 900; letter-spacing: 0.06em; font-size: 15px; }
+.brand-name span { color: var(--lime); }
+#hud-mission { font-size: 13px; line-height: 1.45; margin-top: 2px; }
+#hud-mission b { color: var(--lime); font-size: 15px; }
+.topleft { top: 96px; font-size: 12px; }
+.cta { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); pointer-events: auto; background: var(--gold); color: var(--charcoal); font-weight: 900; font-size: 14px; padding: 9px 18px; border-radius: 999px; text-decoration: none; box-shadow: 0 4px 0 #c99a12, 0 8px 18px rgba(0,0,0,0.35); white-space: nowrap; }
+.cta:hover { filter: brightness(1.08); }
+.card { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(0.9); width: min(440px, 88vw); background: var(--charcoal); border: 3px solid var(--lime); border-radius: 18px; padding: 22px 24px; text-align: center; opacity: 0; pointer-events: none; transition: opacity 0.3s, transform 0.3s; box-shadow: 0 20px 60px rgba(0,0,0,0.55); }
+.card.show { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%) scale(1); }
+.card h2 { margin: 0 0 6px; color: var(--lime); font-size: 26px; font-weight: 900; }
+.card p { margin: 6px 0; font-size: 15px; line-height: 1.45; }
+.card .big { color: var(--gold); font-size: 30px; font-weight: 900; }
+.card a { display: inline-block; margin: 12px 0 6px; background: #25d366; color: #fff; font-weight: 900; font-size: 17px; padding: 12px 22px; border-radius: 999px; text-decoration: none; }
+.card button { display: block; margin: 6px auto 0; background: none; border: 0; color: rgba(255,255,255,0.7); font-size: 13px; cursor: pointer; text-decoration: underline; }
+.card small { display: block; opacity: 0.7; font-size: 12px; margin-top: 4px; }
+.help b { color: var(--lime); }
+.street small { color: var(--lime); opacity: 1; }
+.card { z-index: 5; }

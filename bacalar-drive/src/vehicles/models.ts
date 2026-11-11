@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { BRAND, canvasTexture, drawLogo } from '../gym/brand';
 
 /** Procedural low-poly vehicle and character models. Forward is -Z, up is +Y. */
 
@@ -38,7 +39,29 @@ export function makeWheel(radius: number, width: number, rimColor = '#c9c9c9') {
   return g;
 }
 
-export function jeepModel(color = '#c8452c'): VehicleModel {
+let logoMat: THREE.MeshBasicMaterial | null = null;
+/** Round gym logo decal, shared by all vehicles. */
+function logoDecal(size: number) {
+  if (!logoMat) logoMat = new THREE.MeshBasicMaterial({ map: canvasTexture(drawLogo(256)), transparent: true, side: THREE.DoubleSide });
+  return new THREE.Mesh(new THREE.CircleGeometry(size / 2, 24), logoMat);
+}
+
+/** Brownie, the gym dog, riding along. */
+function brownie() {
+  const g = new THREE.Group();
+  const fur = std('#7b4a26', { roughness: 0.9 });
+  const dark = std('#3a2212', { roughness: 0.9 });
+  g.add(box(0.3, 0.34, 0.42, fur, 0, 0.17, 0));
+  g.add(box(0.26, 0.24, 0.26, fur, 0, 0.46, -0.16));
+  g.add(box(0.14, 0.1, 0.14, fur, 0, 0.42, -0.34));
+  g.add(box(0.06, 0.05, 0.05, dark, 0, 0.45, -0.42));
+  g.add(box(0.07, 0.14, 0.05, dark, -0.12, 0.56, -0.1));
+  g.add(box(0.07, 0.14, 0.05, dark, 0.12, 0.56, -0.1));
+  g.add(box(0.28, 0.05, 0.28, std(BRAND.pink), 0, 0.33, -0.15));
+  return g;
+}
+
+export function jeepModel(color = BRAND.lime): VehicleModel {
   const root = new THREE.Group();
   const paint = std(color, { roughness: 0.45, metalness: 0.25 });
   const black = std('#222', { roughness: 0.8 });
@@ -50,6 +73,21 @@ export function jeepModel(color = '#c8452c'): VehicleModel {
   // tub and hood
   root.add(box(1.72, 0.62, 3.0, paint, 0, 0.55, 0.35));
   root.add(box(1.6, 0.5, 1.25, paint, 0, 0.62, -1.62));
+  // gym livery: pink stripe, logo on the doors and the hood, Brownie in the passenger seat
+  root.add(box(1.74, 0.1, 3.02, std(BRAND.pink, { roughness: 0.45 }), 0, 0.72, 0.35));
+  for (const sx of [-0.875, 0.875]) {
+    const d = logoDecal(0.5);
+    d.position.set(sx, 0.56, 0.2);
+    d.rotation.y = sx > 0 ? Math.PI / 2 : -Math.PI / 2;
+    root.add(d);
+  }
+  const hoodLogo = logoDecal(0.8);
+  hoodLogo.rotation.x = -Math.PI / 2;
+  hoodLogo.position.set(0, 0.875, -1.62);
+  root.add(hoodLogo);
+  const dog = brownie();
+  dog.position.set(0.42, 0.96, -0.2);
+  root.add(dog);
   // grille with seven slots
   root.add(box(1.4, 0.55, 0.08, dark, 0, 0.62, -2.27));
   for (let i = 0; i < 7; i++) root.add(box(0.07, 0.42, 0.04, black, -0.42 + i * 0.14, 0.62, -2.32));
@@ -98,13 +136,13 @@ export function jeepModel(color = '#c8452c'): VehicleModel {
   return { root, lights: [head], brakeLights: [tail], wheel: makeWheel(0.42, 0.3) };
 }
 
-export function motoTaxiModel(color = '#d62828'): VehicleModel {
+export function motoTaxiModel(color = BRAND.lime): VehicleModel {
   const root = new THREE.Group();
   const paint = std(color, { roughness: 0.4, metalness: 0.3 });
   const white = std('#f2f2f2');
   const black = std('#1d1d1d', { roughness: 0.8 });
   const chrome = std('#cfcfcf', { metalness: 0.8, roughness: 0.25 });
-  const canvas = std('#2a6fb0', { roughness: 0.9, side: THREE.DoubleSide });
+  const canvas = std(BRAND.pink, { roughness: 0.9, side: THREE.DoubleSide });
   const head = std('#fffbe6', { emissive: '#fff3c0', emissiveIntensity: 0.2 });
   const tail = std('#7a0b0b', { emissive: '#ff2020', emissiveIntensity: 0.2 });
 
@@ -132,6 +170,9 @@ export function motoTaxiModel(color = '#d62828'): VehicleModel {
   const roof = box(1.35, 0.05, 1.35, canvas, 0, 1.64, 0.5);
   root.add(roof);
   root.add(box(1.36, 0.16, 0.02, canvas, 0, 1.56, -0.17));
+  const backLogo = logoDecal(0.42);
+  backLogo.position.set(0, 0.7, 1.125);
+  root.add(backLogo);
   // tail lights
   for (const sx of [-0.5, 0.5]) root.add(box(0.12, 0.08, 0.03, tail, sx, 0.6, 1.13));
 
@@ -141,7 +182,7 @@ export function motoTaxiModel(color = '#d62828'): VehicleModel {
 export function boatModel(): VehicleModel {
   const root = new THREE.Group();
   const hullMat = std('#f5f5f0', { roughness: 0.35 });
-  const stripe = std('#0f6fa8', { roughness: 0.4 });
+  const stripe = std(BRAND.lime, { roughness: 0.4 });
   const wood = std('#8b5a2b', { roughness: 0.8 });
   const black = std('#1b1b1b', { roughness: 0.6 });
   const glass = new THREE.MeshStandardMaterial({ color: '#a8d6ea', transparent: true, opacity: 0.5, roughness: 0.1 });

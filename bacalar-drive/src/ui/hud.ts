@@ -15,7 +15,13 @@ export class Hud {
   constructor() {
     this.root = document.getElementById('hud')!;
     this.root.innerHTML = `
+      <div class="brand panel">
+        <img id="hud-logo" alt="Bacalar Jungle Gym" />
+        <div><div class="brand-name">BACALAR <span>JUNGLE GYM</span></div><div id="hud-mission"></div></div>
+      </div>
       <div class="topleft panel" id="hud-info"></div>
+      <a class="cta" id="hud-cta" target="_blank" rel="noopener"></a>
+      <div class="card" id="hud-card"></div>
       <div class="minimap" id="hud-minimap"></div>
       <canvas class="speedo" id="hud-speedo" width="340" height="340"></canvas>
       <div class="street" id="hud-street"></div>
@@ -36,13 +42,37 @@ export class Hud {
   setHelp(visible: boolean) {
     this.help.style.display = visible ? '' : 'none';
     this.help.innerHTML = `
-      <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / arrows drive &nbsp; <kbd>Space</kbd> handbrake<br>
-      <kbd>1</kbd> Jeep &nbsp; <kbd>2</kbd> Mototaxi &nbsp; <kbd>3</kbd> Boat &nbsp; <kbd>E</kbd> enter / exit<br>
-      <kbd>C</kbd> camera &nbsp; <kbd>F</kbd> drone &nbsp; <kbd>R</kbd> reset &nbsp; <kbd>T</kbd> skip time &nbsp; <kbd>P</kbd> rain<br>
-      <kbd>H</kbd> hide help &nbsp; click to use the mouse for looking around`;
+      <b>Misión:</b> frena junto a quien pide <b>¡AL GYM!</b> y llévalo al Jungle Gym (pin verde).<br>
+      <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / flechas manejar &nbsp; <kbd>Espacio</kbd> freno de mano<br>
+      <kbd>1</kbd> Jeep &nbsp; <kbd>2</kbd> Mototaxi &nbsp; <kbd>3</kbd> Lancha &nbsp; <kbd>E</kbd> subir / bajar<br>
+      <kbd>C</kbd> cámara &nbsp; <kbd>F</kbd> dron &nbsp; <kbd>R</kbd> reiniciar &nbsp; <kbd>T</kbd> adelantar hora &nbsp; <kbd>P</kbd> lluvia<br>
+      <kbd>H</kbd> ocultar ayuda &nbsp; clic para mirar con el mouse`;
   }
 
   setInfo(html: string) { this.info.innerHTML = html; }
+
+  setBrand(logoDataUrl: string, ctaText: string, ctaUrl: string) {
+    (document.getElementById('hud-logo') as HTMLImageElement).src = logoDataUrl;
+    const a = document.getElementById('hud-cta') as HTMLAnchorElement;
+    a.textContent = ctaText;
+    a.href = ctaUrl;
+  }
+
+  private lastMission = '';
+  setMission(html: string) {
+    if (html === this.lastMission) return;
+    this.lastMission = html;
+    document.getElementById('hud-mission')!.innerHTML = html;
+  }
+
+  /** Reward card with a WhatsApp button; stays until closed. */
+  showCard(html: string) {
+    const el = document.getElementById('hud-card')!;
+    el.innerHTML = html + '<button id="hud-card-close">Seguir manejando</button>';
+    el.classList.add('show');
+    document.exitPointerLock?.();
+    document.getElementById('hud-card-close')!.onclick = () => el.classList.remove('show');
+  }
 
   setStreet(name: string, sub = '') {
     const key = name + '|' + sub;

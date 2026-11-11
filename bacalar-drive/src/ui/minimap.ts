@@ -19,6 +19,9 @@ export class Minimap {
   private buildingHash = new Map<number, Footprint[]>();
   /** meters shown from center to edge */
   range = 260;
+  /** gym position and people waiting for a ride (set by the game) */
+  gym: { x: number; y: number } | null = null;
+  waiting: [number, number][] = [];
 
   constructor(host: HTMLElement, private field: Field, private roads: RoadNetwork, buildings: Footprint[], private landmarks: Poi[]) {
     this.canvas = document.createElement('canvas');
@@ -127,6 +130,32 @@ export class Minimap {
       c.lineWidth = 3;
       c.strokeText(l.name, 0, -12);
       c.fillText(l.name, 0, -12);
+      c.restore();
+    }
+
+    // people who want a ride to the gym
+    c.fillStyle = '#b4e23c';
+    c.strokeStyle = '#20252a';
+    c.lineWidth = 3;
+    for (const [wx, wy] of this.waiting) {
+      c.beginPath(); c.arc((wx - x) * s, -(wy - y) * s, 7, 0, Math.PI * 2); c.fill(); c.stroke();
+    }
+    // the gym: marker when in range, arrow on the rim when far
+    if (this.gym) {
+      const gx = (this.gym.x - x) * s, gy = -(this.gym.y - y) * s;
+      const gd = Math.hypot(gx, gy);
+      c.save();
+      if (gd < R - 26) c.translate(gx, gy);
+      else c.translate((gx / gd) * (R - 26), (gy / gd) * (R - 26));
+      c.rotate(heading);
+      c.fillStyle = '#b4e23c';
+      c.strokeStyle = '#20252a';
+      c.lineWidth = 4;
+      c.beginPath(); c.arc(0, 0, 19, 0, Math.PI * 2); c.fill(); c.stroke();
+      c.fillStyle = '#20252a';
+      c.font = '900 15px system-ui, sans-serif';
+      c.textBaseline = 'middle';
+      c.fillText('GYM', 0, 1);
       c.restore();
     }
 

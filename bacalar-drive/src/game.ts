@@ -22,6 +22,10 @@ import type { Poi } from './data/types';
 import { Landmarks } from './world/landmarks';
 import { PierLayer } from './world/piers';
 import { Rain } from './env/rain';
+import { GymSite } from './gym/gym';
+import { People } from './gym/people';
+import { Pins } from './gym/pins';
+import { BRAND, drawLogo, whatsappUrl } from './gym/brand';
 
 type Progress = (msg: string) => Promise<void>;
 
@@ -47,6 +51,13 @@ export class Game {
   streetLights!: StreetLights;
   minimap!: Minimap;
   landmarks!: Landmarks;
+  gym!: GymSite;
+  people!: People;
+  pins!: Pins;
+  /** mission state: people on board and members delivered to the gym */
+  onboard = 0;
+  socios = 0;
+  private nextReward = 0;
   rain = new Rain();
   readonly lowQuality = /[?&]low\b/.test(location.search);
   private minimapTimer = 0;
@@ -81,25 +92,33 @@ export class Game {
   async init(progress: Progress) {
     await progress('Rasterizing lagoon and terrain…');
     this.landmarks = new Landmarks(this.data);
-    this.world = new World(this.data, (field) => this.landmarks.registerModifiers(field));
+    this.gym = new GymSite(this.data);
+    this.world = new World(this.data, (field) => { this.landmarks.registerModifiers(field); this.gym.registerModifier(field); });
+    this.gym.markOccupied(this.world.field);
     if (this.lowQuality) this.world.loadRadius = 2;
     this.scene.add(this.world.root);
     this.landmarks.markOccupied(this.world.field);
     await progress('Placing buildings and houses…');
     const w = this.world;
-    this.buildings = new BuildingSet(this.data, w.field, w.roads, w.grid, this.landmarks.exclusions());
+    this.buildings = new BuildingSet(this.data, w.field, w.roads, w.grid, [...this.landmarks.exclusions(), this.gym.exclusion()]);
     this.vegetation = new Vegetation(w.field);
     this.streetLights = new StreetLights(w.roads, w.field, w.grid);
     w.layers.push(this.buildings, this.vegetation, this.streetLights, new PierLayer(this.data, w.field, w.grid), new WaterWalls(this.data, w.field, w.roads, w.grid));
     await progress('Building Fuerte de San Felipe and the plaza…');
     this.landmarks.build(this.vegetation.species[2].geo[0], this.vegetation.material);
-    this.scene.add(this.landmarks.group, this.rain.mesh);
+    this.gym.build();
+    this.gym.buildBillboards(w.roads, w.field);
+    this.people = new People(w.roads, w.field);
+    this.pins = new Pins([...this.data.pois, ...this.data.landmarks.filter((l) => !l.kind.startsWith('place:'))], w.field, this.gym);
+    this.scene.add(this.landmarks.group, this.rain.mesh, this.gym.group, this.people.group, this.pins.group);
     this.water = buildWater(w.field);
     this.scene.add(this.water.mesh);
     await progress('Starting physics…');
     this.physics = await Physics.create(w);
-    this.physics.addStatic(this.landmarks.colliders, this.landmarks.boxes);
+    this.physics.addStatic(this.landmarks.colliders, [...this.landmarks.boxes, ...this.gym.boxes]);
     this.hud = new Hud();
+    this.hud.setBrand(drawLogo(128).toDataURL(), `${BRAND.offer} · WhatsApp`, whatsappUrl());
+    try { this.socios = Number(localStorage.getItem('bjg-socios')) || 0; } catch { /* storage unavailable */ }
     this.player = new Player(this.physics, w, this.hud);
     this.scene.add(this.player.root);
     this.jeep = new Car(this.physics, jeepModel(), JEEP);
@@ -107,6 +126,7 @@ export class Game {
     this.boat = new Boat(this.physics, boatModel());
     for (const v of [this.jeep, this.moto, this.boat]) this.player.add(v);
     this.minimap = new Minimap(this.hud.minimapHost, w.field, w.roads, this.buildings.all, this.data.landmarks);
+    this.minimap.gym = { x: this.gym.x, y: this.gym.y };
     this.namedPoints = [...this.data.landmarks.filter((l) => !l.kind.startsWith('place:')), ...this.data.pois];
     await progress('Setting up the scene…');
     this.setupEnvironment();
@@ -172,19 +192,19 @@ export class Game {
     if (input.wasPressed('KeyF')) {
       this.droneActive = !this.droneActive;
       if (this.droneActive) this.drone.takeOver(); else this.rig.snap();
-      this.hud.message(this.droneActive ? 'Drone camera: WASD, mouse, Space / Z, Shift' : 'Drone off');
+      this.hud.message(this.droneActive ? 'Dron: WASD, mouse, Espacio / Z, Shift' : 'Dron apagado');
     }
     if (input.wasPressed('KeyH')) {
       const el = document.getElementById('hud-help')!;
       this.hud.setHelp(el.style.display === 'none');
     }
     if (this.droneActive) return;
-    if (input.wasPressed('KeyC')) { this.rig.cycle(); this.hud.message(`Camera: ${this.rig.mode}`); }
+    if (input.wasPressed('KeyC')) { this.rig.cycle(); this.hud.message(`Cámara: ${{ chase: 'persecución', hood: 'cofre', top: 'aérea' }[this.rig.mode]}`); }
     if (input.wasPressed('KeyR')) p.reset();
-    if (input.wasPressed('KeyT')) { this.atmosphere.skip(2); this.hud.message('Skipping 2 hours…'); }
+    if (input.wasPressed('KeyT')) { this.atmosphere.skip(2); this.hud.message('Adelantando 2 horas…'); }
     if (input.wasPressed('KeyP')) {
       this.atmosphere.rainTarget = this.atmosphere.rainTarget > 0 ? 0 : 1;
-      this.hud.message(this.atmosphere.rainTarget ? 'Rain on' : 'Rain off');
+      this.hud.message(this.atmosphere.rainTarget ? 'Lluvia' : 'Sin lluvia');
     }
     const keys: [string, Vehicle | undefined][] = [['Digit1', this.jeep], ['Digit2', this.moto], ['Digit3', this.boat]];
     for (const [code, v] of keys) {
@@ -197,7 +217,7 @@ export class Game {
       if (p.active) p.exit();
       else {
         const v = p.nearestVehicle();
-        if (v) p.enter(v); else this.hud.message('No vehicle nearby (press 1, 2 or 3 to call one)');
+        if (v) p.enter(v); else this.hud.message('No hay vehículo cerca (pulsa 1, 2 o 3 para llamar uno)');
       }
     }
   }
@@ -214,6 +234,44 @@ export class Game {
     for (const v of p.vehicles) v.syncVisual(this.elapsed);
     const f = p.focus();
     return { x: f.x, y: f.y, h: f.h, kmh: (p.active?.forwardSpeed() ?? 0) * 3.6, heading: p.heading() * 57.3 };
+  }
+
+  /** Pick up people who want to train, drop them at the gym, reward the player with the real offer. */
+  private updateMission(dt: number, fx: number, fy: number) {
+    const p = this.player;
+    const v = p.active;
+    const seats = !v || v.kind !== 'land' ? 0 : v === this.jeep ? 3 : 2;
+    const slow = v ? Math.abs(v.forwardSpeed()) < 3.5 : false;
+    const f = p.focus();
+    const free = Math.max(0, seats - this.onboard);
+    const boarded = this.people.update(dt, this.elapsed, fx, fy, v && slow && free > 0 && !this.droneActive ? { x: f.x, y: f.y, seats: free } : null);
+    if (boarded) {
+      this.onboard += boarded;
+      this.hud.showToast(boarded > 1 ? `¡${boarded} suben contigo!` : '¡Sube contigo!', 'llévalos al Jungle Gym');
+    }
+    const d = this.gym.dropDistance(f.x, f.y);
+    if (this.onboard > 0 && v && slow && d < 10) {
+      this.socios += this.onboard;
+      try { localStorage.setItem('bjg-socios', String(this.socios)); } catch { /* storage unavailable */ }
+      this.hud.showToast(`+${this.onboard} ${this.onboard > 1 ? 'socios' : 'socio'} en el gym`, `total: ${this.socios}`);
+      this.onboard = 0;
+      const goals = [3, 10, 25, 50];
+      const goal = goals.find((g) => g > this.nextReward && this.socios >= g);
+      if (goal) {
+        this.nextReward = goal;
+        this.hud.showCard(`
+          <h2>¡Llevaste ${this.socios} personas al gym!</h2>
+          <p>Ahora te toca a ti.</p>
+          <p class="big">${BRAND.offer}</p>
+          <p>${BRAND.classes.slice(0, 4).join(' · ')}</p>
+          <a href="${whatsappUrl()}" target="_blank" rel="noopener">Reservar por WhatsApp</a>
+          <small>${BRAND.hours}<br>${BRAND.rating} ★ en Google (${BRAND.reviews} reseñas)</small>`);
+      }
+    }
+    this.minimap.waiting = this.people.waiting();
+    const dist = d < 1000 ? `${Math.round(d / 10) * 10} m` : `${(d / 1000).toFixed(1)} km`;
+    const seatTxt = seats ? `A bordo ${this.onboard}/${seats}` : v ? 'La lancha no lleva pasajeros' : 'Sube a un vehículo';
+    this.hud.setMission(`<b>${this.socios}</b> socios llevados · ${seatTxt}<br>Gym a ${dist}`);
   }
 
   /** Street name under the player and toasts for nearby named places. */
@@ -337,6 +395,10 @@ export class Game {
       p.active.object.add(this.headlight, this.headlight.target);
       this.headlight.intensity = 60;
     } else this.headlight.intensity = 0;
+
+    this.updateMission(dt, streamAt.x, streamAt.y);
+    this.gym.update(this.elapsed, atm.night);
+    this.pins.update(dt, streamAt.x, streamAt.y, cam);
 
     // HUD
     this.hud.update(dt);

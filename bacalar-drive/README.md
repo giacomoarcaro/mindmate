@@ -1,4 +1,23 @@
-# Bacalar Drive
+# Bacalar Drive · Bacalar Jungle Gym
+
+The game is themed around the Bacalar Jungle Gym and exists to send people to the gym.
+
+- **Mission**: stop next to pedestrians showing the green "¡AL GYM!" bubble, they climb aboard
+  (Jeep 3 seats, mototaxi 2), then drive them to the gym. The gym stands at its real
+  coordinates (18.6856156, -88.3949969) with a light beacon, a large logo pin and a drop-off
+  ring. At 3, 10, 25 and 50 people delivered a card shows the real offer with a WhatsApp
+  booking button. A WhatsApp button is always visible at the top.
+- **Branding**: lime, pink and charcoal livery on all vehicles, Brownie the gym dog in the
+  Jeep, logo on the HUD and loading screen, billboards along the main roads with the distance
+  to the gym, gym marker and direction arrow on the minimap. UI text is in Spanish.
+- **Pedestrians**: señores with sombrero and guayabera, señoras and abuelas in embroidered
+  huipil, kids, young people, and paleteros pushing their cart, walking along town streets.
+- **Pins**: every named place from the map data gets a map-style pin with its name and a
+  category logo. The data source is OpenStreetMap, not Google Maps.
+- Brand facts live in `src/gym/brand.ts` (offer, hours, prices, WhatsApp number). Offer,
+  hours and prices come from the gym's website and should be confirmed before a public launch.
+- Building facades are procedural. Google Street View imagery cannot be used as textures
+  under Google's terms; see the note at the end of this file.
 
 A 3D open world driving game set in Bacalar, Quintana Roo, Mexico, generated from real
 OpenStreetMap data. Runs in the browser. Built with Vite, TypeScript, Three.js and Rapier
@@ -118,3 +137,11 @@ src/env/                 day and night cycle, rain
 src/ui/                  HUD and minimap
 src/game.ts              game loop
 ```
+
+## About real facade photos
+
+Google's Maps Platform terms forbid extracting Street View imagery, using it as textures or
+creating derivative content from it, so the game does not do that. Legal routes to real
+facades: photos taken by the gym or its partners (drop them in and map them to specific
+buildings), or Mapillary street-level imagery (CC BY-SA, needs a free API token and has
+partial coverage in Bacalar).

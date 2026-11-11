@@ -18,7 +18,7 @@ async function boot() {
   await game.init(async (s) => { setMsg(s); await nextFrame(); });
   document.getElementById('loading')!.classList.add('hidden');
   game.start();
-  (window as unknown as { game: Game }).game = game;
+  (window as unknown as { __game: Game }).__game = game;
 }
 
 boot().catch((err) => {

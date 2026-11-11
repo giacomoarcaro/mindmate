@@ -30,7 +30,7 @@ export function terrainColor(field: Field, x: number, y: number, h: number, out:
   const n = vnoise(x / 23, y / 23) * 0.6 + vnoise(x / 6, y / 6) * 0.4;
   if (d < 0) {
     // lagoon bed: white limestone that darkens with depth
-    const t = Math.min(1, -h / 9);
+    const t = Math.max(0, Math.min(1, -h / 9));
     out.copy(C_BOTTOM).lerp(C_DEEP, t * t);
     return out;
   }
@@ -94,10 +94,12 @@ export function buildFarTerrain(field: Field, step = 50, margin = 3000): THREE.B
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
     const x = minX + i * step, y = minY + j * step;
     // outside the data area, continue the land so the horizon is jungle
-    const inside = field.inBounds(x, y);
-    const h = inside ? field.heightAt(x, y) : field.heightAt(x, y) > 0 ? 15 : field.heightAt(x, y);
+    // minimum over the cell so the coarse mesh never pokes through tiles or water
+    let h = Infinity;
+    for (let b = -2; b <= 2; b++) for (let a = -2; a <= 2; a++) h = Math.min(h, field.heightAt(x + a * step * 0.3, y + b * step * 0.3));
+    if (!field.inBounds(x, y) && h > 0) h = 15;
     const k = (j * nx + i) * 3;
-    pos[k] = x; pos[k + 1] = h - 1.2; pos[k + 2] = -y;
+    pos[k] = x; pos[k + 1] = h - 1.5; pos[k + 2] = -y;
     terrainColor(field, x, y, h, tmp);
     if (h > 1) tmp.lerp(C_JUNGLE, 0.6);
     col[k] = tmp.r; col[k + 1] = tmp.g; col[k + 2] = tmp.b;

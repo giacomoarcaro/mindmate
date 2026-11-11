@@ -4,6 +4,9 @@ import type { MapData } from './data/types';
 import { World } from './world/world';
 import { Input } from './input';
 import { DroneCamera } from './camera/drone';
+import { BuildingSet } from './world/buildings';
+import { Vegetation } from './world/vegetation';
+import { buildWater } from './world/water';
 
 type Progress = (msg: string) => Promise<void>;
 
@@ -13,6 +16,9 @@ export class Game {
   readonly camera = new THREE.PerspectiveCamera(65, 1, 0.3, 6000);
   readonly input: Input;
   world!: World;
+  buildings!: BuildingSet;
+  vegetation!: Vegetation;
+  water!: ReturnType<typeof buildWater>;
   drone: DroneCamera;
   sun = new THREE.DirectionalLight(0xfff4e0, 3.0);
   hemi = new THREE.HemisphereLight(0xbfe6ff, 0x5d6b3a, 1.1);
@@ -40,6 +46,14 @@ export class Game {
     await progress('Rasterizing lagoon and terrain…');
     this.world = new World(this.data);
     this.scene.add(this.world.root);
+    await progress('Placing buildings and houses…');
+    const w = this.world;
+    this.buildings = new BuildingSet(this.data, w.field, w.roads, w.grid, [{ x: 0, y: 0, r: 75 }]);
+    this.vegetation = new Vegetation(w.field);
+    w.layers.push(this.buildings, this.vegetation);
+    this.water = buildWater(w.field);
+    this.scene.add(this.water.mesh);
+    console.info('buildings', this.buildings.count());
     await progress('Setting up the scene…');
     this.setupEnvironment();
     this.findSpawn();
@@ -126,6 +140,10 @@ export class Game {
     this.sun.target.position.copy(target);
     this.sun.position.copy(target).addScaledVector(this.sky.material.uniforms.sunPosition.value, 400);
     this.sky.position.copy(cam);
+    const time = this.clock.elapsedTime;
+    this.water.uniforms.uTime.value = time;
+    this.water.uniforms.uSunDir.value.copy(this.sky.material.uniforms.sunPosition.value).normalize();
+    this.vegetation.time.value = time;
 
     this.fpsAcc.t += dt; this.fpsAcc.n++;
     if (this.fpsAcc.t > 0.5) {

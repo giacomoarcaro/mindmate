@@ -130,6 +130,16 @@ export function facadeTexture() {
   });
 }
 
+/** Emissive mask matching the facade window, lit at night. */
+export function windowGlowTexture() {
+  return canvasTex(256, (g, s) => {
+    g.fillStyle = '#000';
+    g.fillRect(0, 0, s, s);
+    g.fillStyle = '#ffcf7a';
+    g.fillRect(s * 0.34, s * 0.32, s * 0.32, s * 0.38);
+  });
+}
+
 export function roofTexture() {
   return canvasTex(128, (g, s) => {
     speckle(g, s, '#d8d4cc', ['#c4bfb5', '#e9e5de', '#b0aba1'], 3000, 8);

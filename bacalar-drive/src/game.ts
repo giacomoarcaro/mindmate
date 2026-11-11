@@ -12,9 +12,13 @@ import { buildWater } from './world/water';
 import { Physics } from './physics/physics';
 import { Player } from './player';
 import { Hud } from './ui/hud';
-import { Car, type Vehicle } from './vehicles/vehicle';
-import { jeepModel } from './vehicles/models';
-import { JEEP } from './vehicles/specs';
+import { Boat, Car, type Vehicle } from './vehicles/vehicle';
+import { boatModel, jeepModel, motoTaxiModel } from './vehicles/models';
+import { JEEP, MOTOTAXI } from './vehicles/specs';
+import { Atmosphere } from './env/atmosphere';
+import { StreetLights } from './world/streetlights';
+import { Minimap } from './ui/minimap';
+import type { Poi } from './data/types';
 
 type Progress = (msg: string) => Promise<void>;
 
@@ -34,6 +38,16 @@ export class Game {
   rig: CameraRig;
   droneActive = false;
   jeep!: Car;
+  moto!: Car;
+  boat!: Boat;
+  atmosphere!: Atmosphere;
+  streetLights!: StreetLights;
+  minimap!: Minimap;
+  headlight = new THREE.SpotLight(0xfff1d0, 0, 90, 0.55, 0.5, 1.2);
+  private namedPoints: Poi[] = [];
+  private lastPoi: Poi | null = null;
+  private lastRoadName = '';
+  private hudTimer = 0;
   sun = new THREE.DirectionalLight(0xfff4e0, 3.0);
   hemi = new THREE.HemisphereLight(0xbfe6ff, 0x5d6b3a, 1.1);
   sky = new Sky();
@@ -65,7 +79,8 @@ export class Game {
     const w = this.world;
     this.buildings = new BuildingSet(this.data, w.field, w.roads, w.grid, [{ x: 0, y: 0, r: 75 }]);
     this.vegetation = new Vegetation(w.field);
-    w.layers.push(this.buildings, this.vegetation, new WaterWalls(this.data, w.field, w.roads, w.grid));
+    this.streetLights = new StreetLights(w.roads, w.field, w.grid);
+    w.layers.push(this.buildings, this.vegetation, this.streetLights, new WaterWalls(this.data, w.field, w.roads, w.grid));
     this.water = buildWater(w.field);
     this.scene.add(this.water.mesh);
     await progress('Starting physics…');
@@ -74,7 +89,11 @@ export class Game {
     this.player = new Player(this.physics, w, this.hud);
     this.scene.add(this.player.root);
     this.jeep = new Car(this.physics, jeepModel(), JEEP);
-    this.player.add(this.jeep);
+    this.moto = new Car(this.physics, motoTaxiModel(), MOTOTAXI);
+    this.boat = new Boat(this.physics, boatModel());
+    for (const v of [this.jeep, this.moto, this.boat]) this.player.add(v);
+    this.minimap = new Minimap(this.hud.minimapHost, w.field, w.roads, this.buildings.all, this.data.landmarks);
+    this.namedPoints = [...this.data.landmarks.filter((l) => !l.kind.startsWith('place:')), ...this.data.pois];
     await progress('Setting up the scene…');
     this.setupEnvironment();
     this.findSpawn();
@@ -103,6 +122,10 @@ export class Game {
     this.sun.shadow.bias = -0.0004;
     this.sun.shadow.normalBias = 0.6;
     this.scene.add(this.sun, this.sun.target, this.hemi);
+    this.atmosphere = new Atmosphere(this.scene, this.sky, this.sun, this.hemi, this.renderer);
+    this.headlight.position.set(0, 1.2, -1.5);
+    this.headlight.target.position.set(0, -2, -25);
+    this.scene.add(this.headlight, this.headlight.target);
   }
 
   private findSpawn() {
@@ -144,7 +167,12 @@ export class Game {
     if (this.droneActive) return;
     if (input.wasPressed('KeyC')) { this.rig.cycle(); this.hud.message(`Camera: ${this.rig.mode}`); }
     if (input.wasPressed('KeyR')) p.reset();
-    const keys: [string, Vehicle | undefined][] = [['Digit1', this.jeep]];
+    if (input.wasPressed('KeyT')) { this.atmosphere.skip(2); this.hud.message('Skipping 2 hours…'); }
+    if (input.wasPressed('KeyP')) {
+      this.atmosphere.rainTarget = this.atmosphere.rainTarget > 0 ? 0 : 1;
+      this.hud.message(this.atmosphere.rainTarget ? 'Rain on' : 'Rain off');
+    }
+    const keys: [string, Vehicle | undefined][] = [['Digit1', this.jeep], ['Digit2', this.moto], ['Digit3', this.boat]];
     for (const [code, v] of keys) {
       if (v && input.wasPressed(code)) {
         const err = p.summon(v);
@@ -172,6 +200,35 @@ export class Game {
     for (const v of p.vehicles) v.syncVisual(this.elapsed);
     const f = p.focus();
     return { x: f.x, y: f.y, h: f.h, kmh: (p.active?.forwardSpeed() ?? 0) * 3.6, heading: p.heading() * 57.3 };
+  }
+
+  /** Street name under the player and toasts for nearby named places. */
+  private updateNames(x: number, y: number) {
+    const road = this.world.roads.nearest(x, y, 14);
+    if (road && road.dist < road.road.src.width / 2 + 4) {
+      const r = road.road.src;
+      const name = r.name || '';
+      const kind = { primary: 'Carretera', secondary: 'Avenida', residential: 'Calle', service: 'Acceso', track: 'Camino de sascab', path: 'Andador' }[r.cls] ?? '';
+      if (name) {
+        this.hud.setStreet(name, kind);
+        this.lastRoadName = name;
+      } else this.hud.setStreet(kind ? `${kind} sin nombre` : '', '');
+    } else if (this.player.active?.kind === 'water') {
+      this.hud.setStreet('Laguna de Bacalar', 'Laguna de los Siete Colores');
+    } else this.hud.setStreet('');
+
+    let best: Poi | null = null, bd = 70;
+    for (const poi of this.namedPoints) {
+      const d = Math.hypot(poi.x - x, poi.y - y);
+      if (d < bd) { bd = d; best = poi; }
+    }
+    if (best && best !== this.lastPoi) {
+      const kind = best.kind.split(':')[1]?.replace(/_/g, ' ') ?? '';
+      this.hud.showToast(best.name, kind);
+      this.lastPoi = best;
+    } else if (this.lastPoi && Math.hypot(this.lastPoi.x - x, this.lastPoi.y - y) > 160) {
+      this.lastPoi = null;
+    }
   }
 
   private frame(now: number) {
@@ -232,18 +289,46 @@ export class Game {
     const streamAt = this.droneActive ? { x: cam.x, y: -cam.z } : focus;
     this.world.update(streamAt.x, streamAt.y);
 
-    // shadow camera follows the view
-    const sunDir = this.sky.material.uniforms.sunPosition.value as THREE.Vector3;
+    // day and night
     const target = new THREE.Vector3(cam.x, field.heightAt(cam.x, -cam.z), cam.z);
+    const atm = this.atmosphere;
+    atm.update(dt, target);
+    const sunDir = atm.sunDir;
+    // shadow camera follows the view, snapped to texels to avoid shimmering
+    const snap = 240 / 2048;
+    target.x = Math.round(target.x / snap) * snap;
+    target.z = Math.round(target.z / snap) * snap;
     this.sun.target.position.copy(target);
     this.sun.position.copy(target).addScaledVector(sunDir, 400);
     this.sky.position.copy(cam);
-    this.water.uniforms.uTime.value = this.elapsed;
-    this.water.uniforms.uSunDir.value.copy(sunDir).normalize();
+    const wu = this.water.uniforms;
+    wu.uTime.value = this.elapsed;
+    wu.uSunDir.value.copy(sunDir);
+    wu.uDay.value = atm.day;
+    wu.uSkyColor.value.copy(atm.fogColor);
+    wu.uRain.value = atm.rain;
+    wu.uSunColor.value.copy(this.sun.color);
     this.vegetation.time.value = this.elapsed;
+    this.streetLights.setNight(atm.night);
+    this.buildings.setNight(atm.night);
+    const lightsOn = atm.night > 0.35 || atm.rain > 0.5;
+    for (const v of p.vehicles) v.setLights(lightsOn && v === p.active);
+    if (p.active && lightsOn) {
+      p.active.object.add(this.headlight, this.headlight.target);
+      this.headlight.intensity = 60;
+    } else this.headlight.intensity = 0;
 
     // HUD
     this.hud.update(dt);
+    this.hudTimer -= dt;
+    if (this.hudTimer <= 0) {
+      this.hudTimer = 0.2;
+      const f = this.droneActive ? { x: cam.x, y: -cam.z } : focus;
+      this.updateNames(f.x, f.y);
+    }
+    const mapPos = this.droneActive ? { x: cam.x, y: -cam.z } : focus;
+    const mapHeading = this.droneActive ? -this.drone.yaw : p.heading();
+    this.minimap.draw(mapPos.x, mapPos.y, mapHeading);
     if (p.active) {
       this.hud.showSpeedo(true);
       this.hud.drawSpeed(p.active.forwardSpeed() * 3.6, p.active.maxKmh, p.active.name);
@@ -252,7 +337,7 @@ export class Game {
     if (this.fpsAcc.t > 0.5) {
       this.fpsAcc.fps = Math.round(this.fpsAcc.n / this.fpsAcc.t);
       this.fpsAcc.t = 0; this.fpsAcc.n = 0;
-      this.hud.setInfo(`<b>Bacalar</b><br>${this.fpsAcc.fps} fps · ${this.droneActive ? 'drone' : this.rig.mode}`);
+      this.hud.setInfo(`<b>${atm.clock()}</b> &nbsp;Bacalar<br>${this.fpsAcc.fps} fps · ${this.droneActive ? 'drone' : this.rig.mode} camera`);
     }
 
     this.renderer.render(this.scene, this.camera);

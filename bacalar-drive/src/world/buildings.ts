@@ -5,7 +5,7 @@ import { LU_RESIDENTIAL } from './field';
 import type { RoadNetwork } from './roads';
 import type { TileGrid } from './tilegrid';
 import type { Tile, TileLayer } from './world';
-import { facadeTexture, rng, roofTexture } from '../render/textures';
+import { facadeTexture, rng, roofTexture, windowGlowTexture } from '../render/textures';
 import { pushTri } from './roads';
 
 /** Mexican town palette */
@@ -34,7 +34,7 @@ export class BuildingSet implements TileLayer {
 
   constructor(private data: MapData, private field: Field, private roads: RoadNetwork, private grid: TileGrid, exclusions: { x: number; y: number; r: number }[] = []) {
     this.exclusions = exclusions;
-    this.wallMat = new THREE.MeshLambertMaterial({ map: facadeTexture(), vertexColors: true });
+    this.wallMat = new THREE.MeshLambertMaterial({ map: facadeTexture(), vertexColors: true, emissiveMap: windowGlowTexture(), emissive: new THREE.Color('#ffb860'), emissiveIntensity: 0 });
     this.roofMat = new THREE.MeshLambertMaterial({ map: roofTexture(), vertexColors: true });
     const r = rng(1234);
 
@@ -141,6 +141,8 @@ export class BuildingSet implements TileLayer {
       }
     }
   }
+
+  setNight(night: number) { this.wallMat.emissiveIntensity = night * 0.9; }
 
   count() { return { osm: this.all.filter((f) => f.osm).length, procedural: this.all.filter((f) => !f.osm).length }; }
 

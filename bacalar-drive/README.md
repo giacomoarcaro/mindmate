@@ -26,7 +26,7 @@ OpenStreetMap data. Runs in the browser. Built with Vite, TypeScript, Three.js a
 
 ```bash
 npm install
-npm run fetch-map   # downloads OSM data once from Overpass and writes public/data/bacalar.json
+npm run fetch-map   # OSM data from Overpass + Microsoft building footprints, writes public/data/bacalar.json
 npm run dev         # open the printed URL (http://localhost:5173)
 ```
 
@@ -82,7 +82,8 @@ Note: in OSM the lakefront road beside the fort is named "Boulevard 1"; "Bouleva
 is the stretch further south near Cenote Azul. The spawn prefers a road named Costera within
 400 m of the fort and otherwise uses the nearest drivable road, which is the lakefront road.
 
-Map data © OpenStreetMap contributors, available under the Open Database License.
+Map data © OpenStreetMap contributors and building footprints © Microsoft, both under the
+Open Database License.
 
 ## How the world is built
 
@@ -92,10 +93,18 @@ Map data © OpenStreetMap contributors, available under the Open Database Licens
 - **Roads**: ribbon meshes from OSM ways, width by class (primary 9 m, secondary 7 m,
   residential 5 m, track 3 m), asphalt or white sascab dirt by surface, dashed and edge
   lines on primary roads, merged per tile.
-- **Buildings**: OSM footprints are extruded (`building:levels` x 3 m, otherwise 1 to 2
-  floors) with flat roofs, water tanks and a palette of Mexican town colors. OSM has very few
-  footprints in Bacalar, so simple houses are placed along town streets every 15 to 25 m
-  where no footprint exists. Windows light up at night.
+- **Buildings**: real footprints. OpenStreetMap has only 61 buildings in Bacalar, so
+  `scripts/fetch-buildings.ts` adds the 6600 footprints of Microsoft's Global ML Building
+  Footprints (detected from satellite imagery, ODbL). OSM wins where both have the same
+  building. Footprints are extruded (`building:levels` x 3 m, otherwise 1 to 2 floors) with
+  flat roofs, water tanks, a painted base band (guardapolvo), a door on the street side and
+  the Mexican town palette. Windows light up at night.
+- **Businesses**: each named amenity or tourism point from OSM is placed in the building that
+  contains it (or the nearest one) and gets an open storefront, a striped awning and a painted
+  sign with its real name and type (RESTAURANTE, FARMACIA, HOTEL...). Signs glow at night.
+- **Street life**: raised sidewalks with curbs on town streets, utility poles with sagging
+  wires, topes (speed bumps) you feel in the suspension, cars parked half on the curb, dogs
+  napping on the sidewalk.
 - **Lagoon**: one water plane with a shader that maps distance from shore to seven shades of
   blue, with waves, fresnel, sun glitter and a foam line. Cenotes go deep navy almost at once.
 - **Jungle**: instanced low poly broadleaf trees, tall trees, palms and bushes on forest

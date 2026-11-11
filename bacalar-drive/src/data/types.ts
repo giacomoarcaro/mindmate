@@ -22,6 +22,8 @@ export interface Building {
   height?: number;
   kind?: string;
   name?: string;
+  /** 'ms' = Microsoft satellite footprint, otherwise OpenStreetMap */
+  source?: 'osm' | 'ms';
 }
 
 export interface AreaFeature {

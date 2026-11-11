@@ -8,6 +8,11 @@ import type { Tile, TileLayer } from './world';
 import { facadeTexture, rng, roofTexture, windowGlowTexture } from '../render/textures';
 import { pushTri } from './roads';
 import type { FacadeStore } from './facades';
+import type { Poi } from '../data/types';
+import { SignAtlas, shopStyle, type ShopStyle } from './shops';
+
+/** Colors of the painted band at the foot of the walls (guardapolvo). */
+const TRIM = ['#7a2e2a', '#2f5d50', '#8a5a2b', '#1f4e79', '#5a5a5a', '#b9533a', '#3d6b35'];
 
 /** Mexican town palette */
 const PALETTE = ['#f4f1ea', '#f4f1ea', '#f0ebe0', '#e3b04b', '#d9a441', '#3fb8af', '#58c4c6', '#e88fa8', '#f2a7b8', '#c8643b', '#d97a4a', '#f1d77a', '#8fc9e3'];
@@ -22,6 +27,11 @@ export interface Footprint {
   tank: boolean;         // black water tank (tinaco) on the roof
   cx: number; cy: number;
   osm: boolean;
+  trim: THREE.Color;
+  /** business inside, from OSM points */
+  shop?: { name: string; style: ShopStyle };
+  /** index of the outer wall that faces the street (computed on first build) */
+  front?: number;
 }
 
 export class BuildingSet implements TileLayer {
@@ -30,6 +40,9 @@ export class BuildingSet implements TileLayer {
   private hash = new Map<number, Footprint[]>();
   readonly wallMat: THREE.MeshLambertMaterial;
   readonly roofMat: THREE.MeshLambertMaterial;
+  readonly detailMat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
+  private signMat: THREE.MeshLambertMaterial | null = null;
+  private liveSignMats = new Set<THREE.MeshLambertMaterial>();
   /** Areas where no buildings may be placed (landmarks). x, y, radius */
   exclusions: { x: number; y: number; r: number }[] = [];
   /** optional real facade photos (Mapillary) */
@@ -51,10 +64,12 @@ export class BuildingSet implements TileLayer {
         ring, holes: b.rings.slice(1).map((h) => cw(h)), height,
         color: new THREE.Color(PALETTE[Math.floor(r() * PALETTE.length)]),
         roof: new THREE.Color(ROOF_COLORS[Math.floor(r() * ROOF_COLORS.length)]),
-        tank: r() < 0.5, cx, cy, osm: true,
+        tank: r() < 0.5, cx, cy, osm: b.source !== 'ms',
+        trim: new THREE.Color(TRIM[Math.floor(r() * TRIM.length)]),
       });
     }
-    this.scatterHouses(r);
+    // with real satellite footprints there is no need to invent houses
+    if (!data.buildings.some((b) => b.source === 'ms')) this.scatterHouses(r);
   }
 
   private excluded(x: number, y: number) {
@@ -137,6 +152,7 @@ export class BuildingSet implements TileLayer {
               color: new THREE.Color(PALETTE[Math.floor(r() * PALETTE.length)]).multiplyScalar(0.92 + r() * 0.08),
               roof: new THREE.Color(ROOF_COLORS[Math.floor(r() * ROOF_COLORS.length)]),
               tank: r() < 0.6, cx, cy, osm: false,
+              trim: new THREE.Color(TRIM[Math.floor(r() * TRIM.length)]),
             });
           }
           acc += seg;
@@ -145,7 +161,114 @@ export class BuildingSet implements TileLayer {
     }
   }
 
-  setNight(night: number) { this.wallMat.emissiveIntensity = night * 0.9; }
+  /** Put each named business from the map into the building that contains it (or the nearest one). */
+  assignShops(pois: Poi[]) {
+    let n = 0;
+    for (const p of pois) {
+      const style = shopStyle(p.kind);
+      if (!style) continue;
+      let best: Footprint | null = null, bd = 22;
+      const i0 = Math.floor(p.x / 30), j0 = Math.floor(p.y / 30);
+      for (let j = j0 - 1; j <= j0 + 1; j++) for (let i = i0 - 1; i <= i0 + 1; i++) {
+        for (const f of this.hash.get(hkey(i, j)) ?? []) {
+          if (f.shop) continue;
+          const d = pointInPoly(f.ring, p.x, p.y) ? 0 : Math.hypot(f.cx - p.x, f.cy - p.y);
+          if (d < bd) { bd = d; best = f; }
+        }
+      }
+      if (best) { best.shop = { name: p.name, style }; n++; }
+    }
+    return n;
+  }
+
+  /** Painted base band on every wall, a door on the street side, storefront, awning and sign for businesses. */
+  private addDetails(f: Footprint, gmin: number, base: number,
+    wp: number[], wuv: number[], wc: number[], dp: number[], duv: number[], dc: number[],
+    sp: number[], suv: number[], atlas: () => SignAtlas) {
+    const n = f.ring.length / 2;
+    const band = gmin + 0.85;
+    for (let k = 0; k < n; k++) {
+      const k2 = (k + 1) % n;
+      const ax = f.ring[2 * k], ay = f.ring[2 * k + 1], bx = f.ring[2 * k2], by = f.ring[2 * k2 + 1];
+      const len = Math.hypot(bx - ax, by - ay);
+      if (len < 0.3) continue;
+      const ox = ((by - ay) / len) * 0.03, oy = (-(bx - ax) / len) * 0.03;
+      wallQuad(wp, wuv, ax + ox, ay + oy, bx + ox, by + oy, base, band, 0, len / 3.2, 0.02, 0.2);
+      for (let q = 0; q < 6; q++) wc.push(f.trim.r, f.trim.g, f.trim.b);
+    }
+    const k = this.frontWall(f);
+    const k2 = (k + 1) % n;
+    const ax = f.ring[2 * k], ay = f.ring[2 * k + 1], bx = f.ring[2 * k2], by = f.ring[2 * k2 + 1];
+    const len = Math.hypot(bx - ax, by - ay);
+    if (len < 2.5) return;
+    const dx = (bx - ax) / len, dy = (by - ay) / len;   // along the wall
+    const nx = dy, ny = -dx;                             // outward
+    const mx = (ax + bx) / 2, my = (ay + by) / 2;
+    const at = (along: number, out: number): [number, number] => [mx + dx * along + nx * out, my + dy * along + ny * out];
+    const quad = (a0: number, a1: number, h0: number, h1: number, out: number, color: string) => {
+      const [x0, y0] = at(a0, out), [x1, y1] = at(a1, out);
+      wallQuad(dp, duv, x0, y0, x1, y1, h0, h1, 0, 0, 0, 0);
+      const c = new THREE.Color(color);
+      for (let q = 0; q < 6; q++) dc.push(c.r, c.g, c.b);
+    };
+    if (!f.shop) {
+      // a wooden door, off center
+      const off = len > 6 ? -len * 0.22 : 0;
+      quad(off - 0.55, off + 0.55, gmin, gmin + 2.15, 0.06, '#5b3a22');
+      quad(off - 0.65, off + 0.65, gmin + 2.15, gmin + 2.3, 0.07, '#e9e4d8');
+      return;
+    }
+    const s = f.shop.style;
+    const w = Math.min(len * 0.82, 6.4);
+    // open storefront with the roll-up shutter showing above it
+    quad(-w * 0.4, w * 0.4, gmin, gmin + 2.4, 0.06, '#2a2420');
+    quad(-w * 0.4, w * 0.4, gmin + 2.2, gmin + 2.45, 0.07, '#9aa0a6');
+    // striped awning sloping out over the sidewalk
+    const stripes = Math.max(4, Math.round(w / 0.55));
+    const h0 = gmin + 2.75, h1 = gmin + 2.3;
+    for (let i = 0; i < stripes; i++) {
+      const a0 = -w / 2 + (w * i) / stripes, a1 = -w / 2 + (w * (i + 1)) / stripes;
+      const [x0, y0] = at(a0, 0.08), [x1, y1] = at(a1, 0.08), [x2, y2] = at(a1, 1.25), [x3, y3] = at(a0, 1.25);
+      dp.push(x0, h0, -y0, x1, h0, -y1, x2, h1, -y2, x0, h0, -y0, x2, h1, -y2, x3, h1, -y3);
+      for (let q = 0; q < 6; q++) duv.push(0, 0);
+      const c = new THREE.Color(s.awning[i % 2]);
+      for (let q = 0; q < 6; q++) dc.push(c.r, c.g, c.b);
+    }
+    // valance
+    quad(-w / 2, w / 2, h1 - 0.22, h1, 1.25, s.awning[0]);
+    // painted sign board above the awning
+    const cell = atlas().add(f.shop.name, s);
+    if (!cell) return;
+    const sh = Math.min(w / 4, 1.25), sw = sh * 4;
+    const [x0, y0] = at(-sw / 2, 0.1), [x1, y1] = at(sw / 2, 0.1);
+    wallQuad(sp, suv, x0, y0, x1, y1, h0 + 0.12, h0 + 0.12 + sh, cell.u0, cell.u1, cell.v0, cell.v1);
+  }
+
+  /** Outer wall facing the closest street. */
+  private frontWall(f: Footprint) {
+    if (f.front !== undefined) return f.front;
+    let best = 0, bd = Infinity;
+    const n = f.ring.length / 2;
+    for (let k = 0; k < n; k++) {
+      const k2 = (k + 1) % n;
+      const ax = f.ring[2 * k], ay = f.ring[2 * k + 1], bx = f.ring[2 * k2], by = f.ring[2 * k2 + 1];
+      const len = Math.hypot(bx - ax, by - ay);
+      if (len < 2.5) continue;
+      const nx = (by - ay) / len, ny = -(bx - ax) / len;
+      const mx = (ax + bx) / 2 + nx * 2, my = (ay + by) / 2 + ny * 2;
+      const road = this.roads.nearest(mx, my, 40, (r) => r.src.cls !== 'path');
+      if (!road) continue;
+      const toward = (road.x - mx) * nx + (road.y - my) * ny;
+      const d = road.dist - Math.max(0, toward) * 0.5 - Math.min(len, 10) * 0.2;
+      if (toward > -1 && d < bd) { bd = d; best = k; }
+    }
+    f.front = best;
+    return best;
+  }
+
+  setNight(night: number) {
+    if (this.signMat) this.signMat.emissiveIntensity = night * 0.7;
+    for (const m of this.liveSignMats) m.emissiveIntensity = night * 0.7; this.wallMat.emissiveIntensity = night * 0.9; }
 
   count() { return { osm: this.all.filter((f) => f.osm).length, procedural: this.all.filter((f) => !f.osm).length }; }
 
@@ -158,6 +281,9 @@ export class BuildingSet implements TileLayer {
     const rp: number[] = [], ruv: number[] = [], rc: number[] = [];
     const tmpC = new THREE.Color();
     const pp: number[] = [], puv: number[] = [];
+    const dp: number[] = [], duv: number[] = [], dc: number[] = [];
+    const sp: number[] = [], suv: number[] = [];
+    let signs: SignAtlas | null = null;
     const atlas = this.facades?.atlas(tile);
 
     for (const f of list) {
@@ -192,6 +318,7 @@ export class BuildingSet implements TileLayer {
           }
         }
       }
+      this.addDetails(f, gmin, base, wp, wuv, wc, dp, duv, dc, sp, suv, () => (signs ??= new SignAtlas()));
       // roof
       const contour = toV2(f.ring);
       const holes = f.holes.map(toV2);
@@ -227,6 +354,31 @@ export class BuildingSet implements TileLayer {
       tile.group.add(photos);
     }
 
+    if (dp.length) {
+      const details = mesh(dp, duv, dc, this.detailMat);
+      details.castShadow = true;
+      tile.group.add(details);
+    }
+    if (signs && sp.length) {
+      const atlas: SignAtlas = signs;
+      if (!this.signMat) this.signMat = new THREE.MeshLambertMaterial({ emissive: new THREE.Color('#ffffff'), emissiveIntensity: 0 });
+      const mat = this.signMat.clone();
+      mat.map = atlas.tex;
+      mat.emissiveMap = atlas.tex;
+      mat.emissiveIntensity = this.signMat.emissiveIntensity;
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(sp), 3));
+      g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(suv), 2));
+      g.computeVertexNormals();
+      g.computeBoundingSphere();
+      const signMesh = new THREE.Mesh(g, mat);
+      signMesh.userData.ownedByTile = true;
+      signMesh.userData.signMat = true;
+      tile.group.add(signMesh);
+      this.liveSignMats.add(mat);
+      const prev = tile.dispose;
+      tile.dispose = () => { prev(); atlas.tex.dispose(); mat.dispose(); this.liveSignMats.delete(mat); };
+    }
     const pa = walls.geometry.getAttribute('position').array as Float32Array;
     const idx = new Uint32Array(pa.length / 3);
     for (let i = 0; i < idx.length; i++) idx[i] = i;
@@ -324,4 +476,14 @@ function mesh(p: number[], uv: number[], c: number[], mat: THREE.Material) {
   const m = new THREE.Mesh(g, mat);
   m.userData.ownedByTile = true;
   return m;
+}
+
+function pointInPoly(r: Ring, x: number, y: number) {
+  let inside = false;
+  const n = r.length / 2;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const xi = r[2 * i], yi = r[2 * i + 1], xj = r[2 * j], yj = r[2 * j + 1];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
 }

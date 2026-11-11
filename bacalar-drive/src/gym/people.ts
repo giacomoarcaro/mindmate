@@ -223,7 +223,7 @@ export class People {
       if (n.s < 1) { n.s = 1; n.dir = 1; n.side = -n.side; }
       if (n.s > total - 1) { n.s = total - 1; n.dir = -1; n.side = -n.side; }
       const p = this.at(n.road, n.s);
-      const walkway = n.road.src.cls === 'path' ? 0.4 : n.road.src.width / 2 + 0.9;
+      const walkway = n.road.src.cls === 'path' ? 0.4 : n.road.src.width / 2 + 1.35;
       n.x = p.x - p.dy * walkway * n.side;
       n.y = p.y + p.dx * walkway * n.side;
       const d = Math.hypot(n.x - fx, n.y - fy);
@@ -234,7 +234,9 @@ export class People {
         continue;
       }
       const root = n.fig.root;
-      root.position.set(n.x, this.field.heightAt(n.x, n.y) + 0.12, -n.y);
+      // on the raised sidewalk in town, on the road shoulder elsewhere
+      const onWalk = n.road.src.cls !== 'path' && n.road.src.paved && this.field.landuseAt(n.x, n.y) === LU_RESIDENTIAL;
+      root.position.set(n.x, this.field.heightAt(n.x, n.y) + (onWalk ? 0.32 : 0.12), -n.y);
       // forward of the figure is -Z
       root.rotation.y = Math.atan2(-p.dx * n.dir, p.dy * n.dir);
       const sw = Math.sin(time * (4 + n.speed * 3) + n.phase) * (n.fig.skirt ? 0.25 : 0.55);

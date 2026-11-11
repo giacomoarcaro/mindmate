@@ -99,6 +99,8 @@ export class Landmarks {
         apply: (x, y, h) => {
           const sd = sdRing(f.outline, x, y);
           if (sd < 0) return f.base;
+          // roads keep their natural grade so the plateau does not create a dip for cars
+          if (this.nearRoad(x, y)) return h;
           if (sd < MOAT && !this.nearRoad(x, y)) return f.base - MOAT_DEPTH;
           if (sd < MOAT + 30) return f.base + (h - f.base) * smooth((sd - Math.min(sd, MOAT)) / 30);
           return h;
@@ -232,7 +234,11 @@ export class Landmarks {
     for (let k = 0; k < m; k++) {
       const k2 = (k + 1) % m;
       const ax = moatOuter[2 * k], ay = moatOuter[2 * k + 1], bx = moatOuter[2 * k2], by = moatOuter[2 * k2 + 1];
-      if (this.nearRoad((ax + bx) / 2, (ay + by) / 2)) continue;
+      // skip any wall piece that would cut across a road
+      const segLen = Math.hypot(bx - ax, by - ay);
+      let blocked = false;
+      for (let d = 0; d <= segLen && !blocked; d += 0.75) blocked = this.nearRoad(ax + ((bx - ax) * d) / segLen, ay + ((by - ay) * d) / segLen);
+      if (blocked) continue;
       // facing the fort: walk the edge backwards
       cs.wall(bx, by, ax, ay, floor, bx, by, ax, ay, f.base + 0.25);
     }

@@ -32,8 +32,15 @@ export class WaterWalls implements TileLayer {
             const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
             if (onBorder(mx, my)) continue;
             // skip where a road crosses (bridges, causeways)
-            const near = roads.nearest(mx, my, 12, (r) => r.src.cls !== 'path');
-            if (near && near.dist < near.road.src.width / 2 + 2) continue;
+            // sample the whole piece: a wall must never poke into a roadway
+            const pieceLen = Math.hypot(x1 - x0, y1 - y0);
+            let onRoad = false;
+            for (let d = 0; d <= pieceLen && !onRoad; d += 1) {
+              const px = x0 + ((x1 - x0) * d) / (pieceLen || 1), py = y0 + ((y1 - y0) * d) / (pieceLen || 1);
+              const near = roads.nearest(px, py, 12, (r) => r.src.cls !== 'path');
+              onRoad = !!near && near.dist < near.road.src.width / 2 + 2.2;
+            }
+            if (onRoad) continue;
             void field;
             const key = grid.keyAt(mx, my);
             let list = this.byTile.get(key);

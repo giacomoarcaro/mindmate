@@ -24,6 +24,7 @@ import { PierLayer } from './world/piers';
 import { Rain } from './env/rain';
 import { GymSite } from './gym/gym';
 import { FacadeStore } from './world/facades';
+import { StreetProps } from './world/streetprops';
 import { People } from './gym/people';
 import { Pins } from './gym/pins';
 import { BRAND, drawLogo, whatsappUrl } from './gym/brand';
@@ -53,6 +54,7 @@ export class Game {
   minimap!: Minimap;
   landmarks!: Landmarks;
   gym!: GymSite;
+  streetProps!: StreetProps;
   people!: People;
   pins!: Pins;
   /** mission state: people on board and members delivered to the gym */
@@ -103,9 +105,10 @@ export class Game {
     const w = this.world;
     this.buildings = new BuildingSet(this.data, w.field, w.roads, w.grid, [...this.landmarks.exclusions(), this.gym.exclusion()]);
     this.buildings.facades = await FacadeStore.load(import.meta.env.BASE_URL);
+    this.buildings.assignShops(this.data.pois);
     this.vegetation = new Vegetation(w.field);
     this.streetLights = new StreetLights(w.roads, w.field, w.grid);
-    w.layers.push(this.buildings, this.vegetation, this.streetLights, new PierLayer(this.data, w.field, w.grid), new WaterWalls(this.data, w.field, w.roads, w.grid));
+    w.layers.push(this.buildings, this.vegetation, this.streetLights, new PierLayer(this.data, w.field, w.grid), this.streetProps = new StreetProps(w.roads, w.field, w.grid), new WaterWalls(this.data, w.field, w.roads, w.grid));
     await progress('Building Fuerte de San Felipe and the plaza…');
     this.landmarks.build(this.vegetation.species[2].geo[0], this.vegetation.material);
     this.gym.build();
@@ -120,6 +123,8 @@ export class Game {
     this.physics.addStatic(this.landmarks.colliders, [...this.landmarks.boxes, ...this.gym.boxes]);
     this.hud = new Hud();
     this.hud.setBrand(drawLogo(128).toDataURL(), `${BRAND.offer} · WhatsApp`, whatsappUrl());
+    const creditEl = document.querySelector('.credit');
+    if (creditEl) creditEl.textContent = this.data.meta.attribution.replace(/ \(ODbL\)/g, '');
     if (this.buildings.facades) {
       const credit = document.querySelector('.credit');
       if (credit) credit.textContent += ` · ${this.buildings.facades.attribution}`;

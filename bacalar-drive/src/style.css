@@ -1,0 +1,30 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #0d2b3a; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; outline: none; }
+#hud { position: fixed; inset: 0; pointer-events: none; color: #fff; }
+
+#loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 50% 40%, #40c4d4 0%, #1784a8 35%, #0b3f63 70%, #071d33 100%); color: #fff; z-index: 10; transition: opacity 0.6s; }
+#loading.hidden { opacity: 0; pointer-events: none; }
+#loading .title { font-size: 72px; font-weight: 800; letter-spacing: 0.18em; text-shadow: 0 4px 20px rgba(0,0,0,0.35); }
+#loading .sub { font-size: 18px; letter-spacing: 0.3em; text-transform: uppercase; opacity: 0.85; margin-top: 4px; }
+#loading-msg { margin-top: 36px; font-size: 14px; opacity: 0.8; }
+
+.credit { position: absolute; right: 8px; bottom: 6px; font-size: 11px; color: rgba(255,255,255,0.85); text-shadow: 0 1px 2px #000; }
+.panel { background: rgba(8, 24, 36, 0.55); border-radius: 10px; padding: 8px 12px; backdrop-filter: blur(4px); }
+
+.street { position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%); font-size: 20px; font-weight: 600; letter-spacing: 0.04em; text-shadow: 0 2px 6px rgba(0,0,0,0.6); white-space: nowrap; }
+.street small { display: block; text-align: center; font-size: 11px; font-weight: 400; opacity: 0.75; letter-spacing: 0.2em; text-transform: uppercase; }
+.toast { position: absolute; left: 50%; top: 18%; transform: translateX(-50%); font-size: 30px; font-weight: 700; text-shadow: 0 3px 12px rgba(0,0,0,0.6); opacity: 0; transition: opacity 0.5s; text-align: center; white-space: nowrap; }
+.toast small { display: block; font-size: 13px; font-weight: 400; letter-spacing: 0.25em; text-transform: uppercase; opacity: 0.8; }
+.toast.show { opacity: 1; }
+
+.speedo { position: absolute; right: 24px; bottom: 34px; width: 170px; height: 170px; }
+.topleft { position: absolute; left: 12px; top: 12px; font-size: 13px; line-height: 1.5; }
+.topleft b { font-size: 16px; }
+.help { position: absolute; left: 12px; bottom: 12px; font-size: 12px; line-height: 1.55; max-width: 340px; }
+.help kbd { display: inline-block; min-width: 18px; padding: 0 4px; border-radius: 3px; background: rgba(255,255,255,0.18); text-align: center; font-family: inherit; font-size: 11px; }
+.minimap { position: absolute; right: 16px; top: 16px; width: 220px; height: 220px; border-radius: 50%; overflow: hidden; border: 3px solid rgba(255,255,255,0.85); box-shadow: 0 4px 18px rgba(0,0,0,0.4); }
+.minimap canvas { width: 100%; height: 100%; display: block; }
+.message { position: absolute; left: 50%; top: 60%; transform: translateX(-50%); font-size: 15px; opacity: 0; transition: opacity 0.4s; }
+.message.show { opacity: 1; }

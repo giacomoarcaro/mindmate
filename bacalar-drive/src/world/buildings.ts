@@ -7,6 +7,7 @@ import type { TileGrid } from './tilegrid';
 import type { Tile, TileLayer } from './world';
 import { facadeTexture, rng, roofTexture, windowGlowTexture } from '../render/textures';
 import { pushTri } from './roads';
+import type { FacadeStore } from './facades';
 
 /** Mexican town palette */
 const PALETTE = ['#f4f1ea', '#f4f1ea', '#f0ebe0', '#e3b04b', '#d9a441', '#3fb8af', '#58c4c6', '#e88fa8', '#f2a7b8', '#c8643b', '#d97a4a', '#f1d77a', '#8fc9e3'];
@@ -31,6 +32,8 @@ export class BuildingSet implements TileLayer {
   readonly roofMat: THREE.MeshLambertMaterial;
   /** Areas where no buildings may be placed (landmarks). x, y, radius */
   exclusions: { x: number; y: number; r: number }[] = [];
+  /** optional real facade photos (Mapillary) */
+  facades: FacadeStore | null = null;
 
   constructor(private data: MapData, private field: Field, private roads: RoadNetwork, private grid: TileGrid, exclusions: { x: number; y: number; r: number }[] = []) {
     this.exclusions = exclusions;
@@ -154,8 +157,11 @@ export class BuildingSet implements TileLayer {
     const wp: number[] = [], wuv: number[] = [], wc: number[] = [];
     const rp: number[] = [], ruv: number[] = [], rc: number[] = [];
     const tmpC = new THREE.Color();
+    const pp: number[] = [], puv: number[] = [];
+    const atlas = this.facades?.atlas(tile);
 
     for (const f of list) {
+      const photo = atlas ? this.facades!.match(f) : null;
       let gmin = Infinity, gmax = -Infinity;
       for (let k = 0; k < f.ring.length; k += 2) {
         const h = this.field.heightAt(f.ring[k], f.ring[k + 1]);
@@ -176,6 +182,14 @@ export class BuildingSet implements TileLayer {
           // outward normal for a CCW outer / CW hole ring is (dy, -dx)
           wallQuad(wp, wuv, ax, ay, bx, by, base, top, u0, u1, v0, v1);
           for (let q = 0; q < 6; q++) wc.push(f.color.r, f.color.g, f.color.b);
+          if (photo && ring === f.ring && k === photo.wall) {
+            const cell = atlas!.reserve(photo.photo, photo.left, f.color);
+            if (cell) {
+              // photo panel just in front of the wall, from the ground to the roof line
+              const ox = ((by - ay) / len) * 0.06, oy = (-(bx - ax) / len) * 0.06;
+              wallQuad(pp, puv, ax + ox, ay + oy, bx + ox, by + oy, gmin, top - 0.05, cell.u0, cell.u1, cell.v0, cell.v1);
+            }
+          }
         }
       }
       // roof
@@ -201,6 +215,17 @@ export class BuildingSet implements TileLayer {
     tile.group.add(walls, roofs);
     walls.castShadow = roofs.castShadow = true;
     walls.receiveShadow = roofs.receiveShadow = true;
+    if (atlas && pp.length) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pp), 3));
+      g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(puv), 2));
+      g.computeVertexNormals();
+      g.computeBoundingSphere();
+      const photos = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: atlas.tex }));
+      photos.userData.ownedByTile = true;
+      photos.receiveShadow = true;
+      tile.group.add(photos);
+    }
 
     const pa = walls.geometry.getAttribute('position').array as Float32Array;
     const idx = new Uint32Array(pa.length / 3);

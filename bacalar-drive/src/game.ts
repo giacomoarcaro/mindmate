@@ -23,6 +23,7 @@ import { Landmarks } from './world/landmarks';
 import { PierLayer } from './world/piers';
 import { Rain } from './env/rain';
 import { GymSite } from './gym/gym';
+import { FacadeStore } from './world/facades';
 import { People } from './gym/people';
 import { Pins } from './gym/pins';
 import { BRAND, drawLogo, whatsappUrl } from './gym/brand';
@@ -101,6 +102,7 @@ export class Game {
     await progress('Placing buildings and houses…');
     const w = this.world;
     this.buildings = new BuildingSet(this.data, w.field, w.roads, w.grid, [...this.landmarks.exclusions(), this.gym.exclusion()]);
+    this.buildings.facades = await FacadeStore.load(import.meta.env.BASE_URL);
     this.vegetation = new Vegetation(w.field);
     this.streetLights = new StreetLights(w.roads, w.field, w.grid);
     w.layers.push(this.buildings, this.vegetation, this.streetLights, new PierLayer(this.data, w.field, w.grid), new WaterWalls(this.data, w.field, w.roads, w.grid));
@@ -118,6 +120,10 @@ export class Game {
     this.physics.addStatic(this.landmarks.colliders, [...this.landmarks.boxes, ...this.gym.boxes]);
     this.hud = new Hud();
     this.hud.setBrand(drawLogo(128).toDataURL(), `${BRAND.offer} · WhatsApp`, whatsappUrl());
+    if (this.buildings.facades) {
+      const credit = document.querySelector('.credit');
+      if (credit) credit.textContent += ` · ${this.buildings.facades.attribution}`;
+    }
     try { this.socios = Number(localStorage.getItem('bjg-socios')) || 0; } catch { /* storage unavailable */ }
     this.player = new Player(this.physics, w, this.hud);
     this.scene.add(this.player.root);

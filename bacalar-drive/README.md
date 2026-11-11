@@ -16,8 +16,7 @@ The game is themed around the Bacalar Jungle Gym and exists to send people to th
   category logo. The data source is OpenStreetMap, not Google Maps.
 - Brand facts live in `src/gym/brand.ts` (offer, hours, prices, WhatsApp number). Offer,
   hours and prices come from the gym's website and should be confirmed before a public launch.
-- Building facades are procedural. Google Street View imagery cannot be used as textures
-  under Google's terms; see the note at the end of this file.
+- Real facade photos come from Mapillary once downloaded; see the section at the end.
 
 A 3D open world driving game set in Bacalar, Quintana Roo, Mexico, generated from real
 OpenStreetMap data. Runs in the browser. Built with Vite, TypeScript, Three.js and Rapier
@@ -138,10 +137,26 @@ src/ui/                  HUD and minimap
 src/game.ts              game loop
 ```
 
-## About real facade photos
+## Real facade photos (Mapillary)
 
-Google's Maps Platform terms forbid extracting Street View imagery, using it as textures or
-creating derivative content from it, so the game does not do that. Legal routes to real
-facades: photos taken by the gym or its partners (drop them in and map them to specific
-buildings), or Mapillary street-level imagery (CC BY-SA, needs a free API token and has
-partial coverage in Bacalar).
+Building facades are procedural until you download street photos from Mapillary
+(CC BY-SA 4.0). Google Street View is not used: Google's terms forbid using its imagery as
+textures.
+
+1. On mapillary.com open Dashboard > Developers, register an application and copy the
+   "Client Token" (free).
+2. Run the script once:
+
+```bash
+MAPILLARY_TOKEN="MLY|your-token" npm run fetch-facades
+```
+
+It queries the town streets, keeps one photo per 10 m and viewing direction (default cap
+1200, change with `-- --max 2000`), downloads 256 px thumbnails to `public/facades/` and
+writes `public/data/facades.json`. On the next start the game projects each photo onto the
+street-facing wall of the nearest building and adds the Mapillary credit. The game never
+calls Mapillary at runtime.
+
+Limits: coverage depends on what contributors uploaded in Bacalar, photos are forward-facing
+so facades are cropped from the left or right half and look skewed, and each building gets
+one photo on one wall. Buildings without a nearby photo keep the procedural facade.

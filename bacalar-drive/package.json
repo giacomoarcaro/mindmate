@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "fetch-map": "tsx scripts/fetch-osm.ts"
+    "fetch-map": "tsx scripts/fetch-osm.ts",
+    "fetch-facades": "tsx scripts/fetch-facades.ts"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.21.0",

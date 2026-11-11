@@ -85,6 +85,8 @@ async function main() {
       if (!g || h === undefined) continue;
       seen.add(im.id);
       const [x, y] = proj.toLocal(g.coordinates[1], g.coordinates[0]);
+      const b = map.meta.bounds;
+      if (x < b.minX || x > b.maxX || y < b.minY || y > b.maxY) continue;
       found.push({ id: im.id, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, h: Math.round(h), url: im.thumb_256_url, user: im.creator?.username ?? '' });
     }
     process.stdout.write(`\r  cell ${++n}/${cells.size}, ${found.length} photos`);

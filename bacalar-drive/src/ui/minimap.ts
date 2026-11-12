@@ -22,6 +22,9 @@ export class Minimap {
   /** gym position and people waiting for a ride (set by the game) */
   gym: { x: number; y: number } | null = null;
   waiting: [number, number][] = [];
+  /** race route to the gym and rival positions */
+  route: [number, number][] = [];
+  rivals: [number, number][] = [];
 
   constructor(host: HTMLElement, private field: Field, private roads: RoadNetwork, buildings: Footprint[], private landmarks: Poi[]) {
     this.canvas = document.createElement('canvas');
@@ -133,6 +136,23 @@ export class Minimap {
       c.restore();
     }
 
+    // race route
+    if (this.route.length > 1) {
+      c.strokeStyle = 'rgba(180, 226, 60, 0.95)';
+      c.lineWidth = 5;
+      c.setLineDash([10, 6]);
+      c.beginPath();
+      this.route.forEach(([rx, ry], i) => { const px2 = (rx - x) * s, py2 = -(ry - y) * s; if (i) c.lineTo(px2, py2); else c.moveTo(px2, py2); });
+      c.stroke();
+      c.setLineDash([]);
+    }
+    const rivalColors = ['#e63946', '#3a86ff', '#ffbe0b'];
+    this.rivals.forEach(([rx, ry], i) => {
+      c.fillStyle = rivalColors[i % rivalColors.length];
+      c.strokeStyle = '#ffffff';
+      c.lineWidth = 3;
+      c.beginPath(); c.arc((rx - x) * s, -(ry - y) * s, 8, 0, Math.PI * 2); c.fill(); c.stroke();
+    });
     // people who want a ride to the gym
     c.fillStyle = '#b4e23c';
     c.strokeStyle = '#20252a';

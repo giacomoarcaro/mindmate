@@ -13,7 +13,8 @@ export const BRAND = {
   /** Google Maps listing, October 2026 */
   lat: 18.6856156,
   lon: -88.3949969,
-  whatsapp: '529837530375',
+  /** leads go to this WhatsApp number */
+  whatsapp: '393661512335',
   whatsappText: 'Hola! Vengo del juego Bacalar Drive y quiero mi primer día gratis en el Jungle Gym',
   rating: '4.8',
   reviews: 204,
@@ -49,6 +50,7 @@ export function drawLogoWide(width = 768): HTMLCanvasElement {
 }
 
 export const whatsappUrl = () => `https://wa.me/${BRAND.whatsapp}?text=${encodeURIComponent(BRAND.whatsappText)}`;
+export const leadUrl = (text: string) => `https://wa.me/${BRAND.whatsapp}?text=${encodeURIComponent(text)}`;
 
 function dumbbell(g: CanvasRenderingContext2D, cx: number, cy: number, w: number, color: string) {
   g.fillStyle = color;

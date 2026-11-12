@@ -206,6 +206,13 @@ export class Sound {
     });
   }
 
+  /** Race countdown beep; the last one is higher and longer. */
+  beep(go: boolean) {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this.tone(go ? 880 : 440, 'square', t, go ? 0.5 : 0.18, 0.12);
+  }
+
   /** Ka-ching for a reward card. */
   reward() {
     if (!this.ctx) return;

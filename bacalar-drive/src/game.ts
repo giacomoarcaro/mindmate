@@ -30,6 +30,8 @@ import { People } from './gym/people';
 import { Pins } from './gym/pins';
 import { BRAND, drawLogo, whatsappUrl } from './gym/brand';
 import { Sound } from './audio';
+import { RoundScreens, fmtTime } from './ui/round';
+import { Race } from './gym/race';
 import { figure, type Kind } from './gym/people';
 
 type Progress = (msg: string) => Promise<void>;
@@ -70,6 +72,13 @@ export class Game {
   private combo = 0;
   private comboTimer = 0;
   private lastKmh = 0;
+  /** race from the plaza to the gym against three rivals; TIME_LIMIT ends it */
+  readonly TIME_LIMIT = 300;
+  race!: Race;
+  private round = { phase: 'idle' as 'idle' | 'countdown' | 'racing' | 'done', countdown: 0, time: 0, socios: 0, hits: 0, startPuntos: 0, lastBeep: 0 };
+  private best: number | null = null;
+  private screens!: RoundScreens;
+  private routeTimer = 0;
   socios = 0;
   private nextReward = 0;
   rain = new Rain();
@@ -165,6 +174,13 @@ export class Game {
     for (const v of [this.jeep, this.moto, this.boat]) this.player.add(v);
     this.minimap = new Minimap(this.hud.minimapHost, w.field, w.roads, this.buildings.all, this.data.landmarks);
     this.minimap.gym = { x: this.gym.x, y: this.gym.y };
+    this.findSpawn();
+    this.race = new Race(w.roads, w.field, this.physics, this.spawn, { x: this.gym.dropX, y: this.gym.dropY });
+    this.scene.add(this.race.group);
+    this.screens = new RoundScreens();
+    this.screens.onStart = () => this.startRound();
+    this.screens.onRestart = () => this.startRound(true);
+    try { this.best = Number(localStorage.getItem('bjg-best')) || null; } catch { /* storage unavailable */ }
     this.namedPoints = [...this.data.landmarks.filter((l) => !l.kind.startsWith('place:')), ...this.data.pois];
     await progress('Setting up the scene…');
     this.setupEnvironment();
@@ -202,6 +218,77 @@ export class Game {
     this.scene.add(this.headlight, this.headlight.target);
   }
 
+  /** Line everyone up at the plaza and start the 3-2-1 countdown. */
+  private startRound(respawn = false) {
+    if (respawn || this.player.active !== this.jeep) {
+      this.riders = [];
+      this.onboard = 0;
+      this.player.spawnInto(this.jeep, this.spawn.x, this.spawn.y, this.spawn.h + 0.3, this.spawn.heading);
+      this.seatRiders();
+      this.rig.mode = 'chase';
+      this.rig.snap();
+    }
+    this.race.reset(this.spawn);
+    this.round = { phase: 'countdown', countdown: 3.2, time: 0, socios: 0, hits: 0, startPuntos: this.puntos, lastBeep: 4 };
+  }
+
+  private endRound(place: number) {
+    if (this.round.phase !== 'racing') return;
+    this.round.phase = 'done';
+    const t = this.round.time;
+    const won = place === 1;
+    let newBest = false;
+    if (place > 0 && (this.best === null || t < this.best)) {
+      this.best = t; newBest = true;
+      try { localStorage.setItem('bjg-best', String(t)); } catch { /* storage unavailable */ }
+    }
+    if (won) this.sound.reward(); else this.sound.crash(0.3);
+    this.screens.showEnd({
+      won, place, racers: this.race.rivals.length + 1, seconds: t, best: this.best, newBest,
+      socios: this.round.socios, puntos: this.puntos - this.round.startPuntos, hits: this.round.hits,
+    });
+  }
+
+  /** Countdown, race clock, finish line and the HUD race line. */
+  private updateRace(dt: number) {
+    const r = this.round;
+    const f = this.player.focus();
+    if (r.phase === 'countdown') {
+      r.countdown -= dt;
+      const n = Math.ceil(r.countdown);
+      if (n !== r.lastBeep && n >= 1 && n <= 3) { r.lastBeep = n; this.hud.showToast(String(n), 'prepárate', 0.9); this.sound.beep(false); }
+      if (r.countdown <= 0) {
+        r.phase = 'racing';
+        this.hud.showToast('¡YA!', 'primero al Jungle Gym', 1.2);
+        this.sound.beep(true);
+      }
+    } else if (r.phase === 'racing') {
+      r.time += dt;
+      const atGym = this.gym.dropDistance(f.x, f.y) < 12 && this.player.active?.kind === 'land';
+      if (atGym) this.endRound(1 + this.race.finishedCount());
+      else if (r.time >= this.TIME_LIMIT) this.endRound(0);
+    }
+    this.race.update(dt, r.phase === 'racing', r.time);
+    // minimap: race route and rivals
+    this.routeTimer -= dt;
+    if (this.routeTimer <= 0) {
+      this.routeTimer = 0.5;
+      this.minimap.route = r.phase === 'idle' || r.phase === 'done' ? [] : this.race.routeFrom(f.x, f.y);
+    }
+    this.minimap.rivals = r.phase === 'idle' ? [] : this.race.rivals.map((v) => [v.x, v.y] as [number, number]);
+  }
+
+  /** Text for the race part of the HUD. */
+  private raceLine() {
+    const r = this.round;
+    if (r.phase === 'idle') return '';
+    const f = this.player.focus();
+    const pos = r.phase === 'done' ? '' : `${this.race.position(f.x, f.y)}º/${this.race.rivals.length + 1}`;
+    const left = Math.max(0, this.race.remaining(f.x, f.y));
+    const dist = left < 1000 ? `${Math.round(left / 10) * 10} m` : `${(left / 1000).toFixed(1)} km`;
+    return `<span class="race-clock">⏱ ${fmtTime(r.time)}</span> <span class="race-pos">${pos}</span><br>${dist} al gym${this.best ? ` · récord ${fmtTime(this.best)}` : ''}`;
+  }
+
   private findSpawn() {
     const roads = this.world.roads;
     // Start in the historic center, on the street in front of the BACALAR letters, facing them.
@@ -236,6 +323,7 @@ export class Game {
   }
 
   start() {
+    this.screens.showStart(this.race.rivals.map((r) => r.name), this.race.routeLength, this.best, this.isTouch);
     this.renderer.setAnimationLoop((t) => this.frame(t));
   }
 
@@ -341,6 +429,7 @@ export class Game {
         continue;
       }
       this.combo++;
+      this.round.hits++;
       this.comboTimer = 3.5;
       const pts = Math.round((100 + h.speed * 3.6 * 2) * this.combo);
       this.puntos += pts;
@@ -372,24 +461,15 @@ export class Game {
       this.seatRiders();
       this.sound.dropoff();
       this.hud.showToast(`+${n} ${n > 1 ? 'socios' : 'socio'} en el gym`, `+${bonus} puntos · total socios: ${this.socios}`);
-      const goals = [3, 10, 25, 50];
-      const goal = goals.find((g) => g > this.nextReward && this.socios >= g);
-      if (goal) {
-        this.nextReward = goal;
-        this.sound.reward();
-        this.hud.showCard(`
-          <h2>¡Llevaste ${this.socios} personas al gym!</h2>
-          <p>Ahora te toca a ti.</p>
-          <p class="big">${BRAND.offer}</p>
-          <p>${BRAND.classes.slice(0, 4).join(' · ')}</p>
-          <a href="${whatsappUrl()}" target="_blank" rel="noopener">Reservar por WhatsApp</a>
-          <small>${BRAND.hours}<br>${BRAND.rating} ★ en Google (${BRAND.reviews} reseñas)</small>`);
-      }
+      this.round.socios += n;
     }
     this.minimap.waiting = this.people.waiting();
     const dist = d < 1000 ? `${Math.round(d / 10) * 10} m` : `${(d / 1000).toFixed(1)} km`;
     const seatTxt = seats ? `A bordo ${this.riders.length}/${seats}` : v ? 'La lancha no lleva pasajeros' : 'Sube a un vehículo';
-    this.hud.setMission(`<b>${this.puntos.toLocaleString('es-MX')}</b> pts · <b>${this.socios}</b> socios · ${seatTxt}<br>Gym a ${dist}`);
+    const race = this.raceLine();
+    this.hud.setMission(race
+      ? `${race}<br><b>${(this.puntos - this.round.startPuntos).toLocaleString('es-MX')}</b> pts · ${seatTxt}`
+      : `<b>${this.puntos.toLocaleString('es-MX')}</b> pts · ${seatTxt}<br>Gym a ${dist}`);
 
     // engine, tires, crash
     const atm = this.atmosphere;
@@ -452,7 +532,8 @@ export class Game {
     this.handleKeys();
 
     // controls
-    const axes = this.droneActive ? { throttle: 0, steer: 0, handbrake: true } : input.driveAxes();
+    const holding = this.round.phase === 'countdown' || this.screens?.visible;
+    const axes = this.droneActive || holding ? { throttle: 0, steer: 0, handbrake: true } : input.driveAxes();
     if (p.active) p.active.controls = axes;
     for (const v of p.vehicles) if (v !== p.active) v.controls = { throttle: 0, steer: 0, handbrake: true };
 
@@ -533,6 +614,7 @@ export class Game {
       this.headlight.intensity = 60;
     } else this.headlight.intensity = 0;
 
+    this.updateRace(dt);
     this.updateMission(dt, streamAt.x, streamAt.y);
     this.gym.update(this.elapsed, atm.night);
     this.pins.update(dt, streamAt.x, streamAt.y, cam);

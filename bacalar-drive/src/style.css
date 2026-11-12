@@ -123,3 +123,49 @@ body.touch .card .big { font-size: 22px; }
 }
 
 #loading .logo { width: min(340px, 70vw); height: auto; margin-bottom: 8px; filter: drop-shadow(0 8px 18px rgba(0,0,0,0.45)); }
+
+/* ---------- round screens and lead form ---------- */
+#round { position: fixed; inset: 0; z-index: 8; display: none; align-items: center; justify-content: center; padding: max(12px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(12px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); background: rgba(12, 20, 16, 0.62); backdrop-filter: blur(3px); overflow-y: auto; }
+#round.show { display: flex; }
+.rs-card { width: min(520px, 100%); max-height: 100%; overflow-y: auto; background: var(--charcoal); color: #fff; border: 3px solid var(--lime); border-radius: 20px; padding: 18px 22px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); text-align: center; }
+.rs-logo { width: min(220px, 50%); height: auto; display: block; margin: 0 auto 4px; }
+.rs-card h1 { margin: 2px 0 6px; font-size: 28px; font-weight: 900; color: var(--lime); letter-spacing: 0.02em; }
+.rs-lead { font-size: 16px; line-height: 1.45; margin: 4px 0 10px; }
+.rs-lead b { color: var(--gold); }
+.rs-how { text-align: left; margin: 0 0 10px; padding-left: 20px; font-size: 14px; line-height: 1.5; }
+.rs-how b { color: var(--lime); }
+.rs-keys { font-size: 12px; opacity: 0.75; margin: 6px 0 12px; }
+.rs-btn { display: inline-block; border: 0; border-radius: 999px; padding: 12px 22px; font: 900 16px system-ui, sans-serif; cursor: pointer; text-decoration: none; }
+.rs-primary { background: var(--gold); color: var(--charcoal); box-shadow: 0 4px 0 #c99a12; }
+.rs-wa { background: #25d366; color: #fff; width: 100%; margin-top: 10px; }
+.rs-ghost { background: transparent; color: #fff; border: 2px solid rgba(255,255,255,0.5); }
+.rs-btn:focus-visible, .rs-form input:focus-visible, .rs-form select:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.rs-code { display: inline-block; margin: 2px 0 10px; padding: 8px 14px; border: 2px dashed var(--gold); border-radius: 12px; font-size: 15px; }
+.rs-code b { font-family: ui-monospace, Menlo, monospace; font-size: 18px; color: var(--gold); letter-spacing: 0.08em; }
+.rs-stats { display: flex; gap: 8px; justify-content: center; margin: 6px 0 12px; }
+.rs-stats div { flex: 1; background: rgba(255,255,255,0.07); border-radius: 12px; padding: 8px 4px; }
+.rs-stats b { display: block; font-size: 22px; color: var(--lime); font-variant-numeric: tabular-nums; }
+.rs-stats span { font-size: 11px; opacity: 0.75; text-transform: uppercase; letter-spacing: 0.08em; }
+.rs-form { text-align: left; background: rgba(255,255,255,0.06); border-radius: 14px; padding: 12px 14px; margin-bottom: 12px; }
+.rs-form-title { margin: 0 0 6px; font-weight: 900; font-size: 15px; color: var(--lime); text-align: center; }
+.rs-form label { display: block; font-size: 12px; opacity: 0.85; margin: 8px 0 4px; }
+.rs-form input, .rs-form select { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.25); background: #12171b; color: #fff; font-size: 16px; }
+.rs-form small { display: block; text-align: center; opacity: 0.65; font-size: 11px; margin-top: 6px; }
+.rs-sent { background: rgba(37,211,102,0.15); border-radius: 12px; padding: 12px; font-size: 14px; }
+.rs-sent a { color: #6ff0a0; }
+.rs-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+#hud-mission .hurry { color: #ff6b5a; font-weight: 900; }
+@media (max-height: 500px) {
+  .rs-card { padding: 12px 16px; }
+  .rs-logo { width: 120px; }
+  .rs-card h1 { font-size: 22px; }
+  .rs-how { font-size: 12px; }
+  .rs-lead { font-size: 14px; }
+}
+
+#hud-mission .race-clock { font-weight: 900; font-size: 18px; color: #fff; font-variant-numeric: tabular-nums; }
+#hud-mission .race-pos { font-weight: 900; font-size: 18px; color: var(--gold); margin-left: 6px; }
+.rs-best { display: inline-block; background: var(--gold); color: var(--charcoal); font-weight: 900; font-size: 12px; padding: 2px 8px; border-radius: 999px; margin-left: 6px; }
+.rs-sub { opacity: 0.7; font-size: 13px; margin-left: 6px; }
+.rs-stats b { font-size: 19px; }
+body.touch #hud-mission .race-clock, body.touch #hud-mission .race-pos { font-size: 14px; }

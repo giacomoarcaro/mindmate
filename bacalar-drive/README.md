@@ -1,5 +1,15 @@
 # Bacalar Drive · Bacalar Jungle Gym
 
+**The race**: start at the BACALAR letters on the plaza and be first to the Jungle Gym, about
+1.5 km of real streets, against three rivals (Don Chuy, La Güera, El Profe) who drive the
+shortest road route. A 3-2-1 countdown starts the clock; the HUD shows race time, position,
+distance left and your best time (saved in the browser). Five minutes maximum.
+
+At the finish a screen shows time, position and points. Winners get a prize code and a link
+to bacalarjunglegym.com. Everyone gets a short form (name, goal, preferred time) that opens
+WhatsApp with a ready message to +39 366 151 2335; nothing is stored or sent by the game
+itself. The number lives in `src/gym/brand.ts`.
+
 The game is themed around the Bacalar Jungle Gym and exists to send people to the gym.
 
 - **Mission**: stop next to pedestrians showing the green "¡AL GYM!" bubble: they run to the

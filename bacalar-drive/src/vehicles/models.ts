@@ -84,7 +84,7 @@ function brownie() {
   return g;
 }
 
-export function jeepModel(color = BRAND.lime): VehicleModel {
+export function jeepModel(color = BRAND.lime, livery = true): VehicleModel {
   const root = new THREE.Group();
   const paint = std(color, { roughness: 0.45, metalness: 0.25 });
   const black = std('#222', { roughness: 0.8 });
@@ -97,6 +97,7 @@ export function jeepModel(color = BRAND.lime): VehicleModel {
   root.add(box(1.72, 0.62, 3.0, paint, 0, 0.55, 0.35));
   root.add(box(1.6, 0.5, 1.25, paint, 0, 0.62, -1.62));
   // gym livery: pink stripe, logo on the doors and the hood, Brownie in the passenger seat
+  if (livery) {
   root.add(box(1.74, 0.1, 3.02, std(BRAND.pink, { roughness: 0.45 }), 0, 0.72, 0.35));
   for (const sx of [-0.875, 0.875]) {
     const d = sideDecal(0.52, sx);
@@ -114,6 +115,7 @@ export function jeepModel(color = BRAND.lime): VehicleModel {
   root.add(roofSign);
   root.add(box(0.05, 0.36, 0.05, std('#222'), -0.3, 1.76, 0.35));
   root.add(box(0.05, 0.36, 0.05, std('#222'), 0.3, 1.76, 0.35));
+  }
   const dog = brownie();
   dog.position.set(0.42, 0.96, -0.2);
   root.add(dog);
@@ -165,13 +167,13 @@ export function jeepModel(color = BRAND.lime): VehicleModel {
   return { root, lights: [head], brakeLights: [tail], wheel: makeWheel(0.42, 0.3) };
 }
 
-export function motoTaxiModel(color = BRAND.lime): VehicleModel {
+export function motoTaxiModel(color = BRAND.lime, livery = true): VehicleModel {
   const root = new THREE.Group();
   const paint = std(color, { roughness: 0.4, metalness: 0.3 });
   const white = std('#f2f2f2');
   const black = std('#1d1d1d', { roughness: 0.8 });
   const chrome = std('#cfcfcf', { metalness: 0.8, roughness: 0.25 });
-  const canvas = std(BRAND.pink, { roughness: 0.9, side: THREE.DoubleSide });
+  const canvas = std(livery ? BRAND.pink : '#2a6fb0', { roughness: 0.9, side: THREE.DoubleSide });
   const head = std('#fffbe6', { emissive: '#fff3c0', emissiveIntensity: 0.2 });
   const tail = std('#7a0b0b', { emissive: '#ff2020', emissiveIntensity: 0.2 });
 
@@ -199,6 +201,7 @@ export function motoTaxiModel(color = BRAND.lime): VehicleModel {
   const roof = box(1.35, 0.05, 1.35, canvas, 0, 1.64, 0.5);
   root.add(roof);
   root.add(box(1.36, 0.16, 0.02, canvas, 0, 1.56, -0.17));
+  if (livery) {
   const backLogo = logoDecal(0.4);
   backLogo.position.set(0, 0.7, 1.125);
   // logo on both canopy edges
@@ -208,6 +211,7 @@ export function motoTaxiModel(color = BRAND.lime): VehicleModel {
     root.add(side);
   }
   root.add(backLogo);
+  }
   // tail lights
   for (const sx of [-0.5, 0.5]) root.add(box(0.12, 0.08, 0.03, tail, sx, 0.6, 1.13));
 

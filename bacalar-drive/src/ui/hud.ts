@@ -42,11 +42,12 @@ export class Hud {
   setHelp(visible: boolean) {
     this.help.style.display = visible ? '' : 'none';
     this.help.innerHTML = `
-      <b>Misión:</b> frena junto a quien pide <b>¡AL GYM!</b> y llévalo al Jungle Gym (pin verde).<br>
+      <b>Misión:</b> frena junto a quien pide <b>¡AL GYM!</b>: sube a tu auto. Llévalo al Jungle Gym (pin verde).<br>
+      Atropella a los demás para sumar puntos: rebotan y se levantan.<br>
       <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / flechas manejar &nbsp; <kbd>Espacio</kbd> freno de mano<br>
       <kbd>1</kbd> Jeep &nbsp; <kbd>2</kbd> Mototaxi &nbsp; <kbd>3</kbd> Lancha &nbsp; <kbd>E</kbd> subir / bajar<br>
       <kbd>C</kbd> cámara &nbsp; <kbd>F</kbd> dron &nbsp; <kbd>R</kbd> reiniciar &nbsp; <kbd>T</kbd> adelantar hora &nbsp; <kbd>P</kbd> lluvia<br>
-      <kbd>H</kbd> ocultar ayuda &nbsp; clic para mirar con el mouse`;
+      <kbd>G</kbd> claxon &nbsp; <kbd>M</kbd> sonido &nbsp; <kbd>H</kbd> ocultar ayuda &nbsp; clic para mirar con el mouse`;
   }
 
   setInfo(html: string) { this.info.innerHTML = html; }

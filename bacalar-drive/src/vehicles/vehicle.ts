@@ -23,9 +23,14 @@ export abstract class Vehicle {
   abstract readonly camera: CameraSpec;
   /** top speed in km/h for the speedometer */
   abstract readonly maxKmh: number;
+  /** passenger seats (vehicle space): hip position of a seated figure */
+  seats: THREE.Vector3[] = [];
+  /** figures currently riding */
+  readonly riders = new THREE.Group();
 
   constructor(protected physics: Physics, readonly model: VehicleModel) {
     this.object.add(model.root);
+    model.root.add(this.riders);
   }
 
   /** forward speed in m/s (negative when reversing) */
@@ -234,7 +239,7 @@ export class Car extends Vehicle {
 export class Boat extends Vehicle {
   readonly kind = 'water' as const;
   readonly name = 'Lancha';
-  readonly maxKmh = 55;
+  readonly maxKmh = 85;
   readonly camera: CameraSpec = { chaseDist: 9.5, chaseHeight: 3.4, hood: new THREE.Vector3(0.35, 1.9, 0.3) };
   private pitch = 0;
   private roll = 0;
@@ -275,7 +280,7 @@ export class Boat extends Vehicle {
     const vR = lv.x * r.x + lv.z * r.z;
     const mass = this.body.mass();
     const vmax = this.maxKmh / 3.6;
-    let thrust = throttle > 0 ? throttle * 7000 * Math.max(0, 1 - (vF / vmax) ** 2) : throttle * 3000 * Math.max(0, 1 + vF / 5);
+    let thrust = throttle > 0 ? throttle * 11000 * Math.max(0, 1 - (vF / vmax) ** 2) : throttle * 3000 * Math.max(0, 1 + vF / 5);
     if (this.controls.handbrake) thrust = -Math.sign(vF) * 4000;
     this.braking = throttle < 0 && vF > 0.5;
     // keel: kill most sideways motion

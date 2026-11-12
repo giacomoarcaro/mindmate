@@ -2,8 +2,10 @@
 
 The game is themed around the Bacalar Jungle Gym and exists to send people to the gym.
 
-- **Mission**: stop next to pedestrians showing the green "¡AL GYM!" bubble, they climb aboard
-  (Jeep 3 seats, mototaxi 2), then drive them to the gym. The gym stands at its real
+- **Mission**: stop next to pedestrians showing the green "¡AL GYM!" bubble: they run to the
+  car and sit in the back (Jeep 3 seats, mototaxi 2). Drive them to the gym for +500 points
+  each. Knocking other pedestrians over is cartoon style: they fly, bounce, get up and walk
+  off, and score points with a combo multiplier. Hitting a gym-goer scores nothing. The gym stands at its real
   coordinates (18.6856156, -88.3949969) with a light beacon, a large logo pin and a drop-off
   ring. At 3, 10, 25 and 50 people delivered a card shows the real offer with a WhatsApp
   booking button. A WhatsApp button is always visible at the top.
@@ -59,6 +61,8 @@ Append `?low` to the URL for a lighter mode (smaller view distance, 1024 shadow 
 | C | camera: chase, hood, top down |
 | F | free fly drone camera (WASD, mouse, Space up, Z down, Shift fast) |
 | R | reset the vehicle onto the nearest road (boat: nearest open water) |
+| G | horn |
+| M | sound on / off |
 | T | skip 2 hours |
 | P | toggle rain |
 | H | hide or show the help panel |
@@ -122,6 +126,8 @@ Open Database License.
 - **Vehicles**: Rapier `DynamicRayCastVehicleController` for the Jeep (4x4) and the
   mototaxi (three wheels), a planar rigid body with keel and rudder forces for the boat,
   and a kinematic character controller on foot. An arcade anti-roll torque keeps cars upright.
+- **Sound**: all synthesized with WebAudio (engine with gear shifts, tire screech, crashes,
+  hits, boarding and drop-off jingles, horn, rain); no audio files.
 - **Atmosphere**: 24 game hours in 20 real minutes, sun path for Bacalar's latitude (sunrise
   over the lagoon), sky shader, stars, moonlight, fog, street lights on primary roads, rain
   with darker sky, closer fog and rougher water.

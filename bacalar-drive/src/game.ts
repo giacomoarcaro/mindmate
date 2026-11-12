@@ -29,6 +29,8 @@ import { TouchControls } from './ui/touch';
 import { People } from './gym/people';
 import { Pins } from './gym/pins';
 import { BRAND, drawLogo, whatsappUrl } from './gym/brand';
+import { Sound } from './audio';
+import { figure, type Kind } from './gym/people';
 
 type Progress = (msg: string) => Promise<void>;
 
@@ -60,6 +62,14 @@ export class Game {
   pins!: Pins;
   /** mission state: people on board and members delivered to the gym */
   onboard = 0;
+  /** kinds of the people riding with the player */
+  private riders: Kind[] = [];
+  readonly sound = new Sound();
+  /** arcade score for knocking people over, with a short combo window */
+  puntos = 0;
+  private combo = 0;
+  private comboTimer = 0;
+  private lastKmh = 0;
   socios = 0;
   private nextReward = 0;
   rain = new Rain();
@@ -142,11 +152,15 @@ export class Game {
       const credit = document.querySelector('.credit');
       if (credit) credit.textContent += ` · ${this.buildings.facades.attribution}`;
     }
+    try { this.puntos = Number(localStorage.getItem('bjg-puntos')) || 0; } catch { /* storage unavailable */ }
     try { this.socios = Number(localStorage.getItem('bjg-socios')) || 0; } catch { /* storage unavailable */ }
     this.player = new Player(this.physics, w, this.hud);
     this.scene.add(this.player.root);
     this.jeep = new Car(this.physics, jeepModel(), JEEP);
     this.moto = new Car(this.physics, motoTaxiModel(), MOTOTAXI);
+    // hip positions of passengers: Jeep back bench, mototaxi bench
+    this.jeep.seats = [new THREE.Vector3(-0.45, 0.98, 0.95), new THREE.Vector3(0, 0.98, 0.95), new THREE.Vector3(0.45, 0.98, 0.95)];
+    this.moto.seats = [new THREE.Vector3(-0.28, 0.74, 0.78), new THREE.Vector3(0.28, 0.74, 0.78)];
     this.boat = new Boat(this.physics, boatModel());
     for (const v of [this.jeep, this.moto, this.boat]) this.player.add(v);
     this.minimap = new Minimap(this.hud.minimapHost, w.field, w.roads, this.buildings.all, this.data.landmarks);
@@ -245,18 +259,26 @@ export class Game {
       this.atmosphere.rainTarget = this.atmosphere.rainTarget > 0 ? 0 : 1;
       this.hud.message(this.atmosphere.rainTarget ? 'Lluvia' : 'Sin lluvia');
     }
+    if (input.wasPressed('KeyG')) this.sound.horn();
+    if (input.wasPressed('KeyM')) this.hud.message(this.sound.toggleMute() ? 'Sonido apagado' : 'Sonido encendido');
     const keys: [string, Vehicle | undefined][] = [['Digit1', this.jeep], ['Digit2', this.moto], ['Digit3', this.boat]];
     for (const [code, v] of keys) {
       if (v && input.wasPressed(code)) {
         const err = p.summon(v);
-        if (err) this.hud.message(err); else { this.hud.showToast(v.name); this.rig.snap(); }
+        if (err) this.hud.message(err); else {
+          this.hud.showToast(v.name); this.rig.snap();
+          // riders move with you; the boat takes nobody, so they stay waiting for the next car ride
+          if (v.kind === 'water') this.riders = [];
+          this.riders = this.riders.slice(0, v.seats.length || this.riders.length);
+          this.seatRiders();
+        }
       }
     }
     if (input.wasPressed('KeyE')) {
       if (p.active) p.exit();
       else {
         const v = p.nearestVehicle();
-        if (v) p.enter(v); else this.hud.message('No hay vehículo cerca (pulsa 1, 2 o 3 para llamar uno)');
+        if (v) { p.enter(v); this.seatRiders(); } else this.hud.message('No hay vehículo cerca (pulsa 1, 2 o 3 para llamar uno)');
       }
     }
   }
@@ -275,29 +297,86 @@ export class Game {
     return { x: f.x, y: f.y, h: f.h, kmh: (p.active?.forwardSpeed() ?? 0) * 3.6, heading: p.heading() * 57.3 };
   }
 
-  /** Pick up people who want to train, drop them at the gym, reward the player with the real offer. */
+  /** Show the riders sitting in the active vehicle. */
+  private seatRiders() {
+    for (const v of this.player.vehicles) v.riders.clear();
+    const v = this.player.active;
+    if (!v) return;
+    this.riders.forEach((kind, i) => {
+      const seat = v.seats[i];
+      if (!seat) return;
+      const f = figure(kind);
+      f.legs.forEach((l) => { l.rotation.x = Math.PI / 2; });
+      f.arms.forEach((a) => { a.rotation.x = 0.5; });
+      f.root.scale.setScalar(0.92);
+      f.root.position.set(seat.x, seat.y - 0.8, seat.z);
+      v.riders.add(f.root);
+    });
+  }
+
+  /** Pick up people who want to train, drop them at the gym, score points for knocking people over. */
   private updateMission(dt: number, fx: number, fy: number) {
     const p = this.player;
     const v = p.active;
-    const seats = !v || v.kind !== 'land' ? 0 : v === this.jeep ? 3 : 2;
-    const slow = v ? Math.abs(v.forwardSpeed()) < 3.5 : false;
+    const seats = v && v.kind === 'land' ? v.seats.length : 0;
     const f = p.focus();
-    const free = Math.max(0, seats - this.onboard);
-    const boarded = this.people.update(dt, this.elapsed, fx, fy, v && slow && free > 0 && !this.droneActive ? { x: f.x, y: f.y, seats: free } : null);
-    if (boarded) {
-      this.onboard += boarded;
-      this.hud.showToast(boarded > 1 ? `¡${boarded} suben contigo!` : '¡Sube contigo!', 'llévalos al Jungle Gym');
+    const kmh = v ? Math.abs(v.forwardSpeed()) * 3.6 : 0;
+    const car = v && v.kind === 'land' && !this.droneActive ? (() => {
+      const lv = v.body.linvel();
+      const big = v === this.jeep;
+      return {
+        x: f.x, y: f.y, h: f.h, vx: lv.x, vy: -lv.z, heading: v.heading(),
+        halfW: big ? 0.95 : 0.7, halfL: big ? 2.25 : 1.45,
+        speed: Math.hypot(lv.x, lv.z), freeSeats: Math.max(0, seats - this.riders.length), stopped: kmh < 6,
+      };
+    })() : null;
+    const ev = this.people.update(dt, this.elapsed, fx, fy, car);
+
+    this.comboTimer -= dt;
+    if (this.comboTimer <= 0) this.combo = 0;
+    for (const h of ev.hits) {
+      this.sound.hit(Math.min(1, h.speed / 20));
+      if (h.gymGoer) {
+        this.hud.showToast('¡Ese iba al gym!', 'sin puntos · frena para que suban', 2.2);
+        continue;
+      }
+      this.combo++;
+      this.comboTimer = 3.5;
+      const pts = Math.round((100 + h.speed * 3.6 * 2) * this.combo);
+      this.puntos += pts;
+      this.sound.points(this.combo);
+      this.hud.showToast(`+${pts}`, this.combo > 1 ? `combo x${this.combo}` : '¡strike!', 1.6);
+      // the bump slows the car a little
+      if (v) { const lv = v.body.linvel(); v.body.setLinvel({ x: lv.x * 0.93, y: lv.y, z: lv.z * 0.93 }, true); }
     }
+    if (ev.hits.length) { try { localStorage.setItem('bjg-puntos', String(this.puntos)); } catch { /* storage unavailable */ } }
+    for (const b of ev.bounces) this.sound.bounce(b);
+    if (ev.boarded.length) {
+      this.riders.push(...ev.boarded);
+      this.onboard = this.riders.length;
+      this.seatRiders();
+      this.sound.board();
+      this.hud.showToast(ev.boarded.length > 1 ? `¡${ev.boarded.length} suben contigo!` : '¡Sube contigo!', 'llévalos al Jungle Gym');
+    }
+
     const d = this.gym.dropDistance(f.x, f.y);
-    if (this.onboard > 0 && v && slow && d < 10) {
-      this.socios += this.onboard;
-      try { localStorage.setItem('bjg-socios', String(this.socios)); } catch { /* storage unavailable */ }
-      this.hud.showToast(`+${this.onboard} ${this.onboard > 1 ? 'socios' : 'socio'} en el gym`, `total: ${this.socios}`);
+    if (this.riders.length > 0 && v && kmh < 8 && d < 12) {
+      const n = this.riders.length;
+      this.socios += n;
+      const bonus = 500 * n;
+      this.puntos += bonus;
+      try { localStorage.setItem('bjg-socios', String(this.socios)); localStorage.setItem('bjg-puntos', String(this.puntos)); } catch { /* storage unavailable */ }
+      this.people.spawnLeaving(this.riders, f.x, f.y, this.gym.x, this.gym.y);
+      this.riders = [];
       this.onboard = 0;
+      this.seatRiders();
+      this.sound.dropoff();
+      this.hud.showToast(`+${n} ${n > 1 ? 'socios' : 'socio'} en el gym`, `+${bonus} puntos · total socios: ${this.socios}`);
       const goals = [3, 10, 25, 50];
       const goal = goals.find((g) => g > this.nextReward && this.socios >= g);
       if (goal) {
         this.nextReward = goal;
+        this.sound.reward();
         this.hud.showCard(`
           <h2>¡Llevaste ${this.socios} personas al gym!</h2>
           <p>Ahora te toca a ti.</p>
@@ -309,8 +388,22 @@ export class Game {
     }
     this.minimap.waiting = this.people.waiting();
     const dist = d < 1000 ? `${Math.round(d / 10) * 10} m` : `${(d / 1000).toFixed(1)} km`;
-    const seatTxt = seats ? `A bordo ${this.onboard}/${seats}` : v ? 'La lancha no lleva pasajeros' : 'Sube a un vehículo';
-    this.hud.setMission(`<b>${this.socios}</b> socios llevados · ${seatTxt}<br>Gym a ${dist}`);
+    const seatTxt = seats ? `A bordo ${this.riders.length}/${seats}` : v ? 'La lancha no lleva pasajeros' : 'Sube a un vehículo';
+    this.hud.setMission(`<b>${this.puntos.toLocaleString('es-MX')}</b> pts · <b>${this.socios}</b> socios · ${seatTxt}<br>Gym a ${dist}`);
+
+    // engine, tires, crash
+    const atm = this.atmosphere;
+    if (v && !this.droneActive) {
+      const kind = v === this.jeep ? 'jeep' : v === this.moto ? 'moto' : 'boat';
+      const lv = v.body.linvel();
+      const fwd = v.forwardSpeed();
+      const lateral = Math.sqrt(Math.max(0, lv.x * lv.x + lv.z * lv.z - fwd * fwd));
+      const slip = v.kind === 'land' ? Math.max(v.controls.handbrake && kmh > 15 ? 1 : 0, Math.min(1, (lateral - 2.5) / 5)) : 0;
+      this.sound.update(kind, Math.min(1, kmh / v.maxKmh), Math.max(0, v.controls.throttle), Math.max(0, slip), atm.rain);
+      const drop = this.lastKmh - kmh;
+      if (drop > 18 && ev.hits.length === 0) this.sound.crash(Math.min(1, drop / 60));
+    } else this.sound.update('none', 0, 0, 0, atm.rain);
+    this.lastKmh = kmh;
   }
 
   /** Street name under the player and toasts for nearby named places. */

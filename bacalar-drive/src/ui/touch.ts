@@ -33,6 +33,8 @@ export class TouchControls {
         <button class="tc-btn tc-small" data-key="Digit2">Moto</button>
         <button class="tc-btn tc-small" data-key="Digit3">Lancha</button>
         <button class="tc-btn tc-small" data-key="KeyR">Reinicio</button>
+        <button class="tc-btn tc-small" data-key="KeyG">Claxon</button>
+        <button class="tc-btn tc-small" data-key="KeyM">Sonido</button>
         <button class="tc-btn tc-small" id="tc-full">Pantalla</button>
       </div>
       <div class="tc-rotate" id="tc-rotate"><div>Gira el teléfono para jugar mejor</div><small>Toca para cerrar</small></div>`;

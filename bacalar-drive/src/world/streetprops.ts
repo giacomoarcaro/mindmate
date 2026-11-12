@@ -271,7 +271,14 @@ export class StreetProps implements TileLayer {
           // half up on the curb, the way cars park on narrow town streets
           const off = hw + 0.25;
           const x = pts[2 * i] + nrm[i][0] * off * side, y = pts[2 * i + 1] + nrm[i][1] * off * side;
-          if (this.inTown(x, y) && !this.onOtherRoad(road, x, y, 4)) {
+          // not on bends, where drivers cut the corner
+          const a = Math.max(0, i - 2), b2 = Math.min(n - 1, i + 3);
+          const d1x = pts[2 * i] - pts[2 * a], d1y = pts[2 * i + 1] - pts[2 * a + 1];
+          const d2x = pts[2 * b2] - pts[2 * i], d2y = pts[2 * b2 + 1] - pts[2 * i + 1];
+          const bend = Math.abs(Math.atan2(d1x * d2y - d1y * d2x, d1x * d2x + d1y * d2y));
+          // keep both ends of the car well clear of crossings
+          const clear = !this.onOtherRoad(road, x, y, 6) && !this.onOtherRoad(road, x + dx * 2.2, y + dy * 2.2, 5) && !this.onOtherRoad(road, x - dx * 2.2, y - dy * 2.2, 5);
+          if (this.inTown(x, y) && clear && bend < 0.17) {
             const flip = r() < 0.75 ? side : -side;   // most park facing the traffic flow
             const yaw = Math.atan2(-dx * flip, dy * flip);
             this.bucket(x, y).cars.push({ x, y, h: this.roadH(road, x, y) + 0.08, yaw, color: new THREE.Color(CAR_COLORS[Math.floor(r() * CAR_COLORS.length)]) });

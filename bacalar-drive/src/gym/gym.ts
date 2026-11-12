@@ -4,7 +4,7 @@ import { makeProjection } from '../data/projection';
 import type { Field } from '../world/field';
 import type { RoadNetwork } from '../world/roads';
 import { segDistance } from '../world/geom';
-import { BRAND, canvasTexture, drawBillboard, drawLogo, drawSign } from './brand';
+import { BRAND, LOGO_ASPECT, canvasTexture, drawBillboard, drawLogo, drawLogoWide, drawSign } from './brand';
 
 const smooth = (t: number) => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
 
@@ -112,7 +112,7 @@ export class GymSite {
     }
     // rotating logo on the roof
     const roof = new THREE.Group();
-    const disc = new THREE.Mesh(new THREE.CircleGeometry(3.4, 40), new THREE.MeshBasicMaterial({ map: logoTex, transparent: true, side: THREE.DoubleSide }));
+    const disc = new THREE.Mesh(new THREE.PlaneGeometry(4.6 * LOGO_ASPECT(), 4.6), new THREE.MeshBasicMaterial({ map: canvasTexture(drawLogoWide(768)), transparent: true, alphaTest: 0.05 }));
     const back = disc.clone();
     back.rotation.y = Math.PI;
     back.position.z = -0.02;

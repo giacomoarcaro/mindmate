@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BRAND, canvasTexture, drawLogo } from '../gym/brand';
+import { BRAND, LOGO_ASPECT, canvasTexture, drawLogoWide } from '../gym/brand';
 
 /** Procedural low-poly vehicle and character models. Forward is -Z, up is +Y. */
 
@@ -41,9 +41,32 @@ export function makeWheel(radius: number, width: number, rimColor = '#c9c9c9') {
 
 let logoMat: THREE.MeshBasicMaterial | null = null;
 /** Round gym logo decal, shared by all vehicles. */
+/**
+ * Official logo decal; `size` is its height in meters, width follows the logo's proportions.
+ * Single sided (reads correctly from its front, +Z of the plane); use logoBoard for both sides.
+ */
 function logoDecal(size: number) {
-  if (!logoMat) logoMat = new THREE.MeshBasicMaterial({ map: canvasTexture(drawLogo(256)), transparent: true, side: THREE.DoubleSide });
-  return new THREE.Mesh(new THREE.CircleGeometry(size / 2, 24), logoMat);
+  if (!logoMat) logoMat = new THREE.MeshBasicMaterial({ map: canvasTexture(drawLogoWide(512)), transparent: true, alphaTest: 0.05 });
+  return new THREE.Mesh(new THREE.PlaneGeometry(size * LOGO_ASPECT(), size), logoMat);
+}
+
+/** Two back-to-back decals so the logo reads correctly from both sides. */
+function logoBoard(size: number) {
+  const g = new THREE.Group();
+  const front = logoDecal(size);
+  front.position.z = 0.01;
+  const back = logoDecal(size);
+  back.rotation.y = Math.PI;
+  back.position.z = -0.01;
+  g.add(front, back);
+  return g;
+}
+
+/** Decal facing outward on the side of a vehicle (sx < 0 left, sx > 0 right). */
+function sideDecal(size: number, sx: number) {
+  const d = logoDecal(size);
+  d.rotation.y = sx > 0 ? Math.PI / 2 : -Math.PI / 2;
+  return d;
 }
 
 /** Brownie, the gym dog, riding along. */
@@ -76,15 +99,21 @@ export function jeepModel(color = BRAND.lime): VehicleModel {
   // gym livery: pink stripe, logo on the doors and the hood, Brownie in the passenger seat
   root.add(box(1.74, 0.1, 3.02, std(BRAND.pink, { roughness: 0.45 }), 0, 0.72, 0.35));
   for (const sx of [-0.875, 0.875]) {
-    const d = logoDecal(0.5);
-    d.position.set(sx, 0.56, 0.2);
-    d.rotation.y = sx > 0 ? Math.PI / 2 : -Math.PI / 2;
+    const d = sideDecal(0.52, sx);
+    d.position.set(sx, 0.55, 0.3);
     root.add(d);
   }
-  const hoodLogo = logoDecal(0.8);
-  hoodLogo.rotation.x = -Math.PI / 2;
-  hoodLogo.position.set(0, 0.875, -1.62);
+  // on the hood, readable from the driver's seat and the chase camera behind
+  const hoodLogo = logoDecal(0.78);
+  hoodLogo.rotation.set(-Math.PI / 2, Math.PI, 0, 'YXZ');
+  hoodLogo.position.set(0, 0.875, -1.6);
   root.add(hoodLogo);
+  // roof sign on the roll bar, readable from both sides
+  const roofSign = logoBoard(0.62);
+  roofSign.position.set(0, 1.98, 0.35);
+  root.add(roofSign);
+  root.add(box(0.05, 0.36, 0.05, std('#222'), -0.3, 1.76, 0.35));
+  root.add(box(0.05, 0.36, 0.05, std('#222'), 0.3, 1.76, 0.35));
   const dog = brownie();
   dog.position.set(0.42, 0.96, -0.2);
   root.add(dog);
@@ -170,8 +199,14 @@ export function motoTaxiModel(color = BRAND.lime): VehicleModel {
   const roof = box(1.35, 0.05, 1.35, canvas, 0, 1.64, 0.5);
   root.add(roof);
   root.add(box(1.36, 0.16, 0.02, canvas, 0, 1.56, -0.17));
-  const backLogo = logoDecal(0.42);
+  const backLogo = logoDecal(0.4);
   backLogo.position.set(0, 0.7, 1.125);
+  // logo on both canopy edges
+  for (const sx of [-0.69, 0.69]) {
+    const side = sideDecal(0.3, sx);
+    side.position.set(sx, 1.55, 0.5);
+    root.add(side);
+  }
   root.add(backLogo);
   // tail lights
   for (const sx of [-0.5, 0.5]) root.add(box(0.12, 0.08, 0.03, tail, sx, 0.6, 1.13));
@@ -215,6 +250,11 @@ export function boatModel(): VehicleModel {
   ws.rotation.x = -0.4;
   root.add(ws);
   root.add(box(1.6, 0.3, 0.45, std('#e8e2d0'), 0, 0.68, 0.6));
+  for (const sx of [-1.13, 1.13]) {
+    const d = sideDecal(0.42, sx);
+    d.position.set(sx, 0.32, 0.4);
+    root.add(d);
+  }
   // outboard motor
   root.add(box(0.4, 0.7, 0.5, black, 0, 0.95, 2.6));
   root.add(box(0.15, 0.9, 0.15, black, 0, 0.3, 2.7));

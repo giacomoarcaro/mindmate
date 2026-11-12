@@ -24,6 +24,30 @@ export const BRAND = {
   classes: ['Funcional', 'HIIT', 'Powerlifting', 'Cardio Box', 'Full Body', 'Entrenamiento personal'],
 };
 
+/** The gym's official logo (public/brand/jungle-gym-logo.png), loaded before the game starts. */
+export let logoImage: HTMLImageElement | null = null;
+export const LOGO_ASPECT = () => (logoImage ? logoImage.width / logoImage.height : 1);
+
+export function loadLogo(baseUrl: string): Promise<void> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => { logoImage = img; resolve(); };
+    img.onerror = () => resolve();
+    img.src = `${baseUrl}brand/jungle-gym-logo.png`;
+  });
+}
+
+/** The official logo at its own proportions, on a transparent canvas. */
+export function drawLogoWide(width = 768): HTMLCanvasElement {
+  const c = document.createElement('canvas');
+  const a = LOGO_ASPECT();
+  c.width = width;
+  c.height = Math.round(width / a);
+  if (logoImage) c.getContext('2d')!.drawImage(logoImage, 0, 0, c.width, c.height);
+  else c.getContext('2d')!.drawImage(drawLogo(c.height), (c.width - c.height) / 2, 0);
+  return c;
+}
+
 export const whatsappUrl = () => `https://wa.me/${BRAND.whatsapp}?text=${encodeURIComponent(BRAND.whatsappText)}`;
 
 function dumbbell(g: CanvasRenderingContext2D, cx: number, cy: number, w: number, color: string) {
@@ -36,11 +60,17 @@ function dumbbell(g: CanvasRenderingContext2D, cx: number, cy: number, w: number
   }
 }
 
-/** Round badge: dumbbell over a lagoon, BACALAR on top, JUNGLE GYM pill below. */
+/** Square logo canvas: the official logo centered, or a drawn badge if it failed to load. */
 export function drawLogo(size = 512): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = c.height = size;
   const g = c.getContext('2d')!;
+  if (logoImage) {
+    const a = LOGO_ASPECT();
+    const w = a >= 1 ? size : size * a, h = a >= 1 ? size / a : size;
+    g.drawImage(logoImage, (size - w) / 2, (size - h) / 2, w, h);
+    return c;
+  }
   const R = size / 2;
   g.save();
   g.beginPath(); g.arc(R, R, R * 0.96, 0, Math.PI * 2); g.clip();

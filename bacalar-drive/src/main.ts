@@ -1,5 +1,6 @@
 import type { MapData } from './data/types';
 import { Game } from './game';
+import { loadLogo } from './gym/brand';
 
 const msg = document.getElementById('loading-msg')!;
 const setMsg = (s: string) => { msg.textContent = s; };
@@ -13,6 +14,7 @@ async function boot() {
     return;
   }
   const data = (await res.json()) as MapData;
+  await loadLogo(import.meta.env.BASE_URL);
   const canvas = document.getElementById('game') as HTMLCanvasElement;
   const game = new Game(canvas, data);
   await game.init(async (s) => { setMsg(s); await nextFrame(); });

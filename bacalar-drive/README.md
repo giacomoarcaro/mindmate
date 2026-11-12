@@ -41,6 +41,11 @@ npm run build                    # type check and build to dist/
 npm run preview                  # serve the production build
 ```
 
+On phones and tablets the game switches to touch controls and light settings automatically:
+steering stick on the left, gas, brake and handbrake on the right, action buttons along the
+bottom, drag on the view to look around. On foot the stick walks. Landscape is recommended;
+portrait works. Append `?touch` to force the touch controls on a desktop browser.
+
 Append `?low` to the URL for a lighter mode (smaller view distance, 1024 shadow map, pixel ratio 1).
 
 ## Controls
@@ -63,8 +68,8 @@ A gamepad works too: triggers for throttle and brake, left stick to steer, A han
 B enter/exit, X reset, Y camera, dpad for vehicles and rain, Start skip time, Back drone.
 
 The boat only works on water: press 3 near the lagoon and it spawns on the nearest open water
-within 600 m. The player starts in the Jeep on the lakefront road next to the Fuerte de San
-Felipe, facing north.
+within 600 m. The player starts in the Jeep in the historic center, in front of the colored BACALAR
+letters on the main plaza.
 
 ## Map data
 

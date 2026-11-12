@@ -54,7 +54,8 @@ export class Hud {
   setBrand(logoDataUrl: string, ctaText: string, ctaUrl: string) {
     (document.getElementById('hud-logo') as HTMLImageElement).src = logoDataUrl;
     const a = document.getElementById('hud-cta') as HTMLAnchorElement;
-    a.textContent = ctaText;
+    const [long, short] = ctaText.split('|');
+    a.innerHTML = `<span class="cta-l">${escapeHtml(long)}</span><span class="cta-s">${escapeHtml(short ?? long)}</span>`;
     a.href = ctaUrl;
   }
 

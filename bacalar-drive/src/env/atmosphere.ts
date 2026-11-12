@@ -34,6 +34,8 @@ export class Atmosphere {
   day = 1;
   rain = 0;
   rainTarget = 0;
+  /** shorter fog on phones, where fewer tiles are loaded */
+  fogScale = 1;
   readonly fogColor = new THREE.Color();
   readonly stars: THREE.Points;
   readonly moon = new THREE.DirectionalLight(MOON, 0);
@@ -115,8 +117,8 @@ export class Atmosphere {
     this.fogColor.copy(FOG_NIGHT).lerp(FOG_DAY, this.day).lerp(FOG_DUSK, dusk * 0.55).lerp(FOG_RAIN.clone().multiplyScalar(0.25 + 0.75 * this.day), this.rain * 0.85);
     const fog = this.scene.fog as THREE.Fog;
     fog.color.copy(this.fogColor);
-    fog.near = 380 - this.rain * 300;
-    fog.far = 1150 - this.rain * 700;
+    fog.near = (380 - this.rain * 300) * this.fogScale;
+    fog.far = (1150 - this.rain * 700) * this.fogScale;
     this.renderer.setClearColor(this.fogColor);
 
     (this.stars.material as THREE.PointsMaterial).opacity = this.night * (1 - this.rain);

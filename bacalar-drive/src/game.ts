@@ -25,6 +25,7 @@ import { Rain } from './env/rain';
 import { GymSite } from './gym/gym';
 import { FacadeStore } from './world/facades';
 import { StreetProps } from './world/streetprops';
+import { TouchControls } from './ui/touch';
 import { People } from './gym/people';
 import { Pins } from './gym/pins';
 import { BRAND, drawLogo, whatsappUrl } from './gym/brand';
@@ -62,11 +63,16 @@ export class Game {
   socios = 0;
   private nextReward = 0;
   rain = new Rain();
-  readonly lowQuality = /[?&]low\b/.test(location.search);
+  /** phones and tablets get on-screen controls and the light settings */
+  readonly isTouch = TouchControls.wanted();
+  readonly lowQuality = /[?&]low\b/.test(location.search) || this.isTouch;
+  touch: TouchControls | null = null;
   private minimapTimer = 0;
   headlight = new THREE.SpotLight(0xfff1d0, 0, 90, 0.55, 0.5, 1.2);
   private namedPoints: Poi[] = [];
   private lastPoi: Poi | null = null;
+  /** seconds during which the welcome title owns the toast */
+  private welcomeUntil = 0;
   private lastRoadName = '';
   private hudTimer = 0;
   sun = new THREE.DirectionalLight(0xfff4e0, 3.0);
@@ -78,8 +84,8 @@ export class Game {
   private elapsed = 0;
 
   constructor(readonly canvas: HTMLCanvasElement, readonly data: MapData) {
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, /[?&]low\b/.test(location.search) ? 1 : 1.5));
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !this.isTouch, powerPreference: 'high-performance' });
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.lowQuality ? 1.25 : 1.5));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -87,7 +93,7 @@ export class Game {
     this.input = new Input(canvas);
     this.drone = new DroneCamera(this.camera);
     this.rig = new CameraRig(this.camera);
-    canvas.addEventListener('click', () => this.input.requestPointerLock());
+    if (!this.isTouch) canvas.addEventListener('click', () => this.input.requestPointerLock());
     window.addEventListener('resize', () => this.resize());
     this.resize();
   }
@@ -107,6 +113,7 @@ export class Game {
     this.buildings.facades = await FacadeStore.load(import.meta.env.BASE_URL);
     this.buildings.assignShops(this.data.pois);
     this.vegetation = new Vegetation(w.field);
+    if (this.lowQuality) this.vegetation.spacing = 8.5;
     this.streetLights = new StreetLights(w.roads, w.field, w.grid);
     w.layers.push(this.buildings, this.vegetation, this.streetLights, new PierLayer(this.data, w.field, w.grid), this.streetProps = new StreetProps(w.roads, w.field, w.grid), new WaterWalls(this.data, w.field, w.roads, w.grid));
     await progress('Building Fuerte de San Felipe and the plaza…');
@@ -114,6 +121,7 @@ export class Game {
     this.gym.build();
     this.gym.buildBillboards(w.roads, w.field);
     this.people = new People(w.roads, w.field);
+    if (this.lowQuality) this.people.max = 18;
     this.pins = new Pins([...this.data.pois, ...this.data.landmarks.filter((l) => !l.kind.startsWith('place:'))], w.field, this.gym);
     this.scene.add(this.landmarks.group, this.rain.mesh, this.gym.group, this.people.group, this.pins.group);
     this.water = buildWater(w.field);
@@ -122,7 +130,12 @@ export class Game {
     this.physics = await Physics.create(w);
     this.physics.addStatic(this.landmarks.colliders, [...this.landmarks.boxes, ...this.gym.boxes]);
     this.hud = new Hud();
-    this.hud.setBrand(drawLogo(128).toDataURL(), `${BRAND.offer} · WhatsApp`, whatsappUrl());
+    if (this.isTouch) {
+      this.touch = new TouchControls(this.input, this.canvas);
+      this.touch.onFoot = () => !this.player?.active;
+      this.hud.setHelp(false);
+    }
+    this.hud.setBrand(drawLogo(128).toDataURL(), `${BRAND.offer} · WhatsApp|Día gratis · WhatsApp`, whatsappUrl());
     const creditEl = document.querySelector('.credit');
     if (creditEl) creditEl.textContent = this.data.meta.attribution.replace(/ \(ODbL\)/g, '');
     if (this.buildings.facades) {
@@ -145,6 +158,7 @@ export class Game {
     await progress('Building tiles around Fuerte de San Felipe…');
     this.world.preload(this.spawn.x, this.spawn.y, 2);
     this.player.spawnInto(this.jeep, this.spawn.x, this.spawn.y, this.spawn.h + 0.3, this.spawn.heading);
+    this.welcomeUntil = 4.5;
   }
 
   private setupEnvironment() {
@@ -168,6 +182,7 @@ export class Game {
     this.sun.shadow.normalBias = 0.6;
     this.scene.add(this.sun, this.sun.target, this.hemi);
     this.atmosphere = new Atmosphere(this.scene, this.sky, this.sun, this.hemi, this.renderer);
+    if (this.lowQuality) this.atmosphere.fogScale = 0.72;
     this.headlight.position.set(0, 1.2, -1.5);
     this.headlight.target.position.set(0, -2, -25);
     this.scene.add(this.headlight, this.headlight.target);
@@ -175,6 +190,19 @@ export class Game {
 
   private findSpawn() {
     const roads = this.world.roads;
+    // Start in the historic center, on the street in front of the BACALAR letters, facing them.
+    const sign = this.landmarks.signSpot;
+    if (sign) {
+      // straight in front of the letters, so the chase camera frames them head on
+      let d = 13;
+      for (let t = 10; t <= 26; t += 1) {
+        const r = roads.nearest(sign.x + sign.nx * t, sign.y + sign.ny * t, 10, (o) => o.src.cls !== 'path');
+        if (r && r.dist < r.road.src.width / 2 - 1) { d = t; break; }
+      }
+      const x = sign.x + sign.nx * d, y = sign.y + sign.ny * d;
+      this.spawn = { x, y, h: Math.max(this.world.field.heightAt(x, y), sign.h) + 0.2, heading: Math.atan2(-sign.nx, -sign.ny) };
+      return;
+    }
     const costera = (r: { src: { name: string } }) => /costera/i.test(r.src.name);
     const drivable = (r: { src: { cls: string } }) => r.src.cls !== 'path';
     // Prefer a road named "Costera" near the fort, otherwise the nearest drivable road
@@ -300,6 +328,11 @@ export class Game {
       this.hud.setStreet('Laguna de Bacalar', 'Laguna de los Siete Colores');
     } else this.hud.setStreet('');
 
+    if (this.elapsed < this.welcomeUntil) {
+      if (!this.lastPoi) this.hud.showToast('BACALAR', 'Pueblo Mágico · centro histórico', 4);
+      this.lastPoi = this.namedPoints[0] ?? null;
+      return;
+    }
     let best: Poi | null = null, bd = 70;
     for (const poi of this.namedPoints) {
       const d = Math.hypot(poi.x - x, poi.y - y);

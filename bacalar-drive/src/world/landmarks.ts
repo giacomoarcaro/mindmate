@@ -29,6 +29,8 @@ interface Plaza { ring: Ring; cx: number; cy: number; h: number }
  */
 export class Landmarks {
   fort: Fort | null = null;
+  /** where the BACALAR letters stand and the direction they face (toward the fort) */
+  signSpot: { x: number; y: number; h: number; nx: number; ny: number } | null = null;
   plaza: Plaza | null = null;
   readonly group = new THREE.Group();
   readonly colliders: { positions: Float32Array; indices: Uint32Array }[] = [];
@@ -379,6 +381,7 @@ export class Landmarks {
     const nx = fx / fl, ny = fy / fl;           // facing direction (toward the fort)
     const sx = p.cx + (ex - p.cx) * 0.78, sy = p.cy + (ey - p.cy) * 0.78;
     this.buildLetters('BACALAR', sx, sy, p.h + 0.14, nx, ny);
+    this.signSpot = { x: sx, y: sy, h: p.h + 0.14, nx, ny };
   }
 
   private buildLetters(word: string, cx: number, cy: number, h: number, nx: number, ny: number) {

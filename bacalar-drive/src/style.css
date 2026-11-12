@@ -55,3 +55,69 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0d2b3a; fon
 .help b { color: var(--lime); }
 .street small { color: var(--lime); opacity: 1; }
 .card { z-index: 5; }
+
+/* ---------- touch controls and small screens ---------- */
+html, body, #game { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; overscroll-behavior: none; }
+#touch { position: fixed; inset: 0; pointer-events: none; z-index: 3; }
+#touch .tc-btn, #touch .tc-stick, #touch .tc-rotate { pointer-events: auto; touch-action: none; }
+.tc-btn { border: 0; color: #fff; font: 800 13px system-ui, sans-serif; letter-spacing: 0.04em; background: rgba(32, 37, 42, 0.62); border-radius: 14px; backdrop-filter: blur(3px); -webkit-tap-highlight-color: transparent; }
+.tc-btn.on { filter: brightness(1.4); transform: scale(0.96); }
+.tc-stick { position: absolute; left: calc(18px + env(safe-area-inset-left, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); width: 150px; height: 150px; }
+.tc-ring { position: absolute; inset: 0; border-radius: 50%; border: 3px solid rgba(255,255,255,0.55); background: rgba(32,37,42,0.35); }
+.tc-knob { position: absolute; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; background: var(--lime); box-shadow: 0 3px 10px rgba(0,0,0,0.4); }
+.tc-pedals { position: absolute; right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 12px; align-items: flex-end; }
+.tc-gas { width: 92px; height: 138px; background: rgba(120, 170, 30, 0.8); font-size: 17px; }
+.tc-brake { width: 82px; height: 96px; background: rgba(200, 60, 50, 0.75); font-size: 15px; }
+.tc-hb { position: absolute; right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(166px + env(safe-area-inset-bottom, 0px)); width: 186px; height: 40px; font-size: 12px; }
+.tc-top { position: absolute; left: calc(178px + env(safe-area-inset-left, 0px)); right: calc(214px + env(safe-area-inset-right, 0px)); bottom: calc(8px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 5px; flex-wrap: wrap-reverse; justify-content: center; }
+.tc-small { padding: 8px 7px; font-size: 11px; border-radius: 10px; white-space: nowrap; }
+.tc-rotate { display: none; position: absolute; inset: 0; background: rgba(15, 20, 24, 0.82); color: #fff; font: 800 20px system-ui, sans-serif; align-items: center; justify-content: center; flex-direction: column; gap: 8px; text-align: center; padding: 24px; }
+.tc-rotate small { font-weight: 400; font-size: 13px; opacity: 0.8; }
+@media (orientation: portrait) { body.touch .tc-rotate:not(.hidden) { display: flex; } }
+
+body.touch .help, body.touch .topleft { display: none !important; }
+body.touch .brand { left: calc(8px + env(safe-area-inset-left, 0px)); top: calc(8px + env(safe-area-inset-top, 0px)); padding: 5px 9px; gap: 7px; }
+body.touch .brand img { width: 40px; height: 40px; }
+body.touch .brand-name { font-size: 12px; }
+body.touch #hud-mission { font-size: 11px; }
+body.touch #hud-mission b { font-size: 13px; }
+body.touch .cta { top: calc(8px + env(safe-area-inset-top, 0px)); font-size: 12px; padding: 7px 13px; }
+body.touch .minimap { width: 118px; height: 118px; right: calc(10px + env(safe-area-inset-right, 0px)); top: calc(8px + env(safe-area-inset-top, 0px)); }
+body.touch .speedo { width: 104px; height: 104px; right: calc(136px + env(safe-area-inset-right, 0px)); top: calc(8px + env(safe-area-inset-top, 0px)); bottom: auto; }
+body.touch .street { bottom: calc(52px + env(safe-area-inset-bottom, 0px)); font-size: 15px; }
+body.touch .toast { font-size: 21px; top: 21%; }
+body.touch .credit { right: calc(16px + env(safe-area-inset-right, 0px)); bottom: 0; font-size: 8px; white-space: nowrap; }
+body.touch .message { top: 52%; font-size: 13px; }
+body.touch .card { padding: 14px 16px; }
+body.touch .card h2 { font-size: 19px; }
+body.touch .card .big { font-size: 22px; }
+@media (max-height: 420px) {
+  .tc-stick { width: 124px; height: 124px; }
+  .tc-gas { height: 112px; width: 82px; }
+  .tc-brake { height: 80px; width: 72px; }
+  .tc-hb { bottom: calc(136px + env(safe-area-inset-bottom, 0px)); width: 166px; height: 34px; }
+  .tc-top { left: calc(150px + env(safe-area-inset-left, 0px)); right: calc(190px + env(safe-area-inset-right, 0px)); bottom: calc(6px + env(safe-area-inset-bottom, 0px)); }
+}
+
+.cta-s { display: none; }
+@media (max-width: 760px) {
+  .cta-l { display: none; }
+  .cta-s { display: inline; }
+  body.touch .brand-name { display: none; }
+  body.touch .brand img { width: 34px; height: 34px; }
+  body.touch .cta { left: auto; transform: none; right: calc(214px + env(safe-area-inset-right, 0px)); font-size: 11px; padding: 6px 11px; }
+  body.touch .minimap { width: 100px; height: 100px; }
+  body.touch .speedo { width: 86px; height: 86px; right: calc(116px + env(safe-area-inset-right, 0px)); top: calc(10px + env(safe-area-inset-top, 0px)); }
+  body.touch .cta { top: calc(104px + env(safe-area-inset-top, 0px)); right: calc(10px + env(safe-area-inset-right, 0px)); }
+  body.touch #tc-full { display: none; }
+  body.touch .street { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); font-size: 13px; }
+  body.touch .toast { font-size: 18px; top: 24%; }
+}
+@media (orientation: portrait) {
+  body.touch .tc-top { left: calc(8px + env(safe-area-inset-left, 0px)); right: calc(8px + env(safe-area-inset-right, 0px)); bottom: auto; top: calc(150px + env(safe-area-inset-top, 0px)); flex-wrap: wrap; }
+  body.touch .speedo { width: 84px; height: 84px; right: calc(16px + env(safe-area-inset-right, 0px)); top: auto; bottom: calc(216px + env(safe-area-inset-bottom, 0px)); }
+  body.touch .minimap { width: 96px; height: 96px; }
+  body.touch .brand { right: calc(112px + env(safe-area-inset-right, 0px)); }
+  body.touch .cta { top: calc(108px + env(safe-area-inset-top, 0px)); left: 50%; right: auto; transform: translateX(-50%); }
+  body.touch .street { bottom: calc(232px + env(safe-area-inset-bottom, 0px)); }
+}

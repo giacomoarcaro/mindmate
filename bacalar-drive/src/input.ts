@@ -8,6 +8,8 @@ export class Input {
   pointerLocked = false;
   gamepad: Gamepad | null = null;
   private padPrev: boolean[] = [];
+  /** analog values from the on-screen touch controls */
+  readonly touch = { active: false, steer: 0, throttle: 0, handbrake: false };
 
   constructor(private el: HTMLElement) {
     window.addEventListener('keydown', (e) => {
@@ -32,6 +34,17 @@ export class Input {
   }
 
   isDown(code: string) { return this.down.has(code); }
+
+  /** Press or release a key from the on-screen controls. */
+  setVirtual(code: string, on: boolean) {
+    if (on) {
+      if (!this.down.has(code)) this.pressed.add(code);
+      this.down.add(code);
+    } else this.down.delete(code);
+  }
+
+  /** One-shot press (buttons such as camera or enter / exit). */
+  tap(code: string) { this.pressed.add(code); }
 
   /** True once per key press. */
   wasPressed(code: string) { return this.pressed.has(code); }
@@ -67,6 +80,12 @@ export class Input {
     if (this.isDown('KeyA') || this.isDown('ArrowLeft')) steer -= 1;
     if (this.isDown('KeyD') || this.isDown('ArrowRight')) steer += 1;
     let handbrake = this.isDown('Space');
+    const t = this.touch;
+    if (t.active) {
+      if (Math.abs(t.steer) > 0.04) steer = t.steer;
+      if (t.throttle) throttle = t.throttle;
+      if (t.handbrake) handbrake = true;
+    }
     const gp = this.gamepad;
     if (gp) {
       const rt = gp.buttons[7]?.value ?? 0, lt = gp.buttons[6]?.value ?? 0;

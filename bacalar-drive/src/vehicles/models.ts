@@ -218,6 +218,63 @@ export function motoTaxiModel(color = BRAND.lime, livery = true): VehicleModel {
   return { root, lights: [head], brakeLights: [tail], wheel: makeWheel(0.3, 0.14, '#888') };
 }
 
+/** Lime green sport bike with a full fairing and a rider in gym colors. */
+export function sportBikeModel(color = '#3ddc2e', rider = true): VehicleModel {
+  const root = new THREE.Group();
+  const paint = std(color, { roughness: 0.3, metalness: 0.35 });
+  const black = std('#151515', { roughness: 0.6 });
+  const chrome = std('#c9c9c9', { metalness: 0.8, roughness: 0.25 });
+  const glass = new THREE.MeshStandardMaterial({ color: '#1a2428', roughness: 0.1, metalness: 0.4, transparent: true, opacity: 0.7 });
+  const head = std('#fffbe6', { emissive: '#fff3c0', emissiveIntensity: 0.2 });
+  const tail = std('#7a0b0b', { emissive: '#ff2020', emissiveIntensity: 0.2 });
+  const part = (w: number, h: number, d: number, m: THREE.Material, x: number, y: number, z: number, rx = 0) => {
+    const b = box(w, h, d, m, x, y, z);
+    b.rotation.x = rx;
+    root.add(b);
+    return b;
+  };
+  // fairing: pointed nose, tank, belly pan, raised tail
+  part(0.34, 0.42, 0.62, paint, 0, 0.86, -0.72, 0.35);
+  part(0.3, 0.2, 0.3, black, 0, 0.66, -0.98, 0.5);
+  part(0.36, 0.3, 0.62, paint, 0, 0.95, -0.2);
+  part(0.34, 0.34, 0.8, paint, 0, 0.56, -0.25);
+  part(0.3, 0.12, 0.2, black, 0, 0.52, -0.1);
+  part(0.26, 0.1, 0.5, black, 0, 0.94, 0.32);
+  part(0.26, 0.2, 0.52, paint, 0, 0.98, 0.72, -0.3);
+  part(0.2, 0.05, 0.12, tail, 0, 1.02, 1.0);
+  // screen, bars, forks, exhaust
+  const screen = part(0.3, 0.26, 0.03, glass, 0, 1.2, -0.72, -0.9);
+  screen.castShadow = false;
+  part(0.6, 0.04, 0.04, black, 0, 1.08, -0.55);
+  for (const sx of [-0.13, 0.13]) part(0.04, 0.62, 0.04, chrome, sx, 0.62, -0.78, -0.42);
+  const pipe = part(0.1, 0.1, 0.62, chrome, 0.2, 0.52, 0.55, 0.25);
+  pipe.castShadow = false;
+  const lamp = part(0.22, 0.1, 0.04, head, 0, 0.98, -1.03, 0.35);
+  lamp.castShadow = false;
+  // white stripe and gym logo on the fairing
+  part(0.37, 0.05, 0.6, std('#f4f4f4'), 0, 0.72, -0.25);
+  for (const sx of [-0.181, 0.181]) {
+    const d = sideDecal(0.26, sx);
+    d.position.set(sx, 0.6, -0.25);
+    root.add(d);
+  }
+  if (rider) {
+    // rider tucked over the tank, in gym colors
+    const suit = std(BRAND.charcoal, { roughness: 0.7 });
+    const lime = std(BRAND.lime);
+    part(0.36, 0.24, 0.6, suit, 0, 1.22, 0.06, 0.55);
+    part(0.3, 0.06, 0.3, lime, 0, 1.36, 0.0, 0.55);
+    part(0.28, 0.28, 0.3, lime, 0, 1.5, -0.32);
+    part(0.25, 0.1, 0.05, black, 0, 1.5, -0.47);
+    for (const sx of [-0.2, 0.2]) {
+      part(0.1, 0.1, 0.5, suit, sx, 1.2, -0.3, 0.35);
+      part(0.13, 0.42, 0.16, suit, sx, 0.86, 0.26, 0.5);
+      part(0.12, 0.3, 0.14, suit, sx, 0.62, 0.42, -0.4);
+    }
+  }
+  return { root, lights: [head], brakeLights: [tail], wheel: makeWheel(0.32, 0.11, '#2bd41f') };
+}
+
 export function boatModel(): VehicleModel {
   const root = new THREE.Group();
   const hullMat = std('#f5f5f0', { roughness: 0.35 });

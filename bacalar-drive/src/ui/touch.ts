@@ -30,7 +30,8 @@ export class TouchControls {
         <button class="tc-btn tc-small" data-key="KeyE">Bajar</button>
         <button class="tc-btn tc-small" data-key="KeyC">Cámara</button>
         <button class="tc-btn tc-small" data-key="Digit1">Jeep</button>
-        <button class="tc-btn tc-small" data-key="Digit2">Moto</button>
+        <button class="tc-btn tc-small" data-key="Digit2">Mototaxi</button>
+        <button class="tc-btn tc-small" data-key="Digit4">Moto</button>
         <button class="tc-btn tc-small" data-key="Digit3">Lancha</button>
         <button class="tc-btn tc-small" data-key="KeyR">Reinicio</button>
         <button class="tc-btn tc-small" data-key="KeyG">Claxon</button>

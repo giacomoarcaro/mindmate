@@ -13,8 +13,8 @@ import { Physics } from './physics/physics';
 import { Player } from './player';
 import { Hud } from './ui/hud';
 import { Boat, Car, type Vehicle } from './vehicles/vehicle';
-import { boatModel, jeepModel, motoTaxiModel } from './vehicles/models';
-import { JEEP, MOTOTAXI } from './vehicles/specs';
+import { boatModel, jeepModel, motoTaxiModel, sportBikeModel } from './vehicles/models';
+import { JEEP, MOTO, MOTOTAXI } from './vehicles/specs';
 import { Atmosphere } from './env/atmosphere';
 import { StreetLights } from './world/streetlights';
 import { Minimap } from './ui/minimap';
@@ -34,6 +34,7 @@ import { Effects } from './render/fx';
 import { Clouds } from './env/clouds';
 import { RoundScreens, fmtTime } from './ui/round';
 import { Race } from './gym/race';
+import { Net, PHRASES, randomRoom, serverUrl } from './net/net';
 import { figure, type Kind } from './gym/people';
 
 type Progress = (msg: string) => Promise<void>;
@@ -55,6 +56,7 @@ export class Game {
   droneActive = false;
   jeep!: Car;
   moto!: Car;
+  bike!: Car;
   boat!: Boat;
   atmosphere!: Atmosphere;
   streetLights!: StreetLights;
@@ -80,6 +82,8 @@ export class Game {
   /** race from the plaza to the gym against three rivals; TIME_LIMIT ends it */
   readonly TIME_LIMIT = 300;
   race!: Race;
+  net: Net | null = null;
+  private quickN = 1;
   private round = { phase: 'idle' as 'idle' | 'countdown' | 'racing' | 'done', countdown: 0, time: 0, socios: 0, hits: 0, startPuntos: 0, lastBeep: 0 };
   private best: number | null = null;
   private screens!: RoundScreens;
@@ -177,7 +181,9 @@ export class Game {
     this.jeep.seats = [new THREE.Vector3(-0.45, 0.98, 0.95), new THREE.Vector3(0, 0.98, 0.95), new THREE.Vector3(0.45, 0.98, 0.95)];
     this.moto.seats = [new THREE.Vector3(-0.28, 0.74, 0.78), new THREE.Vector3(0.28, 0.74, 0.78)];
     this.boat = new Boat(this.physics, boatModel());
-    for (const v of [this.jeep, this.moto, this.boat]) this.player.add(v);
+    this.bike = new Car(this.physics, sportBikeModel(), MOTO);
+    this.bike.seats = [new THREE.Vector3(0, 1.2, 0.5)];
+    for (const v of [this.jeep, this.moto, this.boat, this.bike]) this.player.add(v);
     this.minimap = new Minimap(this.hud.minimapHost, w.field, w.roads, this.buildings.all, this.data.landmarks);
     this.minimap.gym = { x: this.gym.x, y: this.gym.y };
     this.findSpawn();
@@ -186,6 +192,20 @@ export class Game {
     this.screens = new RoundScreens();
     this.screens.onStart = () => this.startRound();
     this.screens.onRestart = () => this.startRound(true);
+    const mpUrl = serverUrl();
+    if (mpUrl) {
+      this.net = new Net(mpUrl, w.field);
+      this.scene.add(this.net.group);
+      this.screens.onJoin = (name, code) => this.joinRoom(name, code);
+      this.net.onChat = (name, text) => this.hud.message(`${name}: ${text}`, 3);
+      this.net.onStatus = (s) => {
+        if (s === 'full') {
+          if (this.net!.room.startsWith('PUBLICA')) { this.quickN++; this.net!.join(`PUBLICA${this.quickN}`, this.nick, 0); }
+          else this.hud.message('La sala está llena (8 jugadores)', 5);
+        } else if (s === 'reconnecting') this.hud.message('Conexión perdida, reconectando…', 4);
+        else if (s === 'online') this.hud.message(`Sala ${this.net!.room}: comparte el enlace para invitar`, 5);
+      };
+    }
     try { this.best = Number(localStorage.getItem('bjg-best')) || null; } catch { /* storage unavailable */ }
     this.namedPoints = [...this.data.landmarks.filter((l) => !l.kind.startsWith('place:')), ...this.data.pois];
     await progress('Setting up the scene…');
@@ -298,6 +318,23 @@ export class Game {
     return `<span class="race-clock">⏱ ${fmtTime(r.time)}</span> <span class="race-pos">${pos}</span><br>${dist} al gym${this.best ? ` · récord ${fmtTime(this.best)}` : ''}`;
   }
 
+  private nick = 'Jugador';
+
+  /** Enter a multiplayer room: free roam together (the bot race stays a solo mode). */
+  private joinRoom(name: string, code: string | 'quick') {
+    if (!this.net) return;
+    this.nick = name;
+    this.round.phase = 'idle';
+    this.race.hide();
+    const room = code === 'quick' ? `PUBLICA${this.quickN}` : code || randomRoom();
+    this.net.join(room, name, this.player.active === this.moto ? 1 : this.player.active === this.bike ? 2 : 0);
+    if (!room.startsWith('PUBLICA')) {
+      const link = `${location.origin}${location.pathname}?sala=${room}`;
+      history.replaceState(null, '', `?sala=${room}`);
+      navigator.clipboard?.writeText(link).then(() => this.hud.message('Enlace de la sala copiado: pégalo en WhatsApp', 5)).catch(() => undefined);
+    }
+  }
+
   private findSpawn() {
     const roads = this.world.roads;
     // Start in the historic center, on the street in front of the BACALAR letters, facing them.
@@ -333,7 +370,8 @@ export class Game {
   }
 
   start() {
-    this.screens.showStart(this.race.rivals.map((r) => r.name), this.race.routeLength, this.best, this.isTouch);
+    const invite = (new URLSearchParams(location.search).get('sala') ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+    this.screens.showStart(this.race.rivals.map((r) => r.name), this.race.routeLength, this.best, this.isTouch, !!this.net, invite);
     this.renderer.setAnimationLoop((t) => this.frame(t));
   }
 
@@ -358,8 +396,13 @@ export class Game {
       this.hud.message(this.atmosphere.rainTarget ? 'Lluvia' : 'Sin lluvia');
     }
     if (input.wasPressed('KeyG')) this.sound.horn();
+    if (this.net?.status === 'online') {
+      ['Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0'].forEach((code, i) => {
+        if (input.wasPressed(code)) { this.net!.chat(i); this.hud.message(`Tú: ${PHRASES[i]}`, 2); }
+      });
+    }
     if (input.wasPressed('KeyM')) this.hud.message(this.sound.toggleMute() ? 'Sonido apagado' : 'Sonido encendido');
-    const keys: [string, Vehicle | undefined][] = [['Digit1', this.jeep], ['Digit2', this.moto], ['Digit3', this.boat]];
+    const keys: [string, Vehicle | undefined][] = [['Digit1', this.jeep], ['Digit2', this.moto], ['Digit3', this.boat], ['Digit4', this.bike]];
     for (const [code, v] of keys) {
       if (v && input.wasPressed(code)) {
         const err = p.summon(v);
@@ -424,7 +467,7 @@ export class Game {
       const big = v === this.jeep;
       return {
         x: f.x, y: f.y, h: f.h, vx: lv.x, vy: -lv.z, heading: v.heading(),
-        halfW: big ? 0.95 : 0.7, halfL: big ? 2.25 : 1.45,
+        halfW: big ? 0.95 : v === this.bike ? 0.45 : 0.7, halfL: big ? 2.25 : v === this.bike ? 1.1 : 1.45,
         speed: Math.hypot(lv.x, lv.z), freeSeats: Math.max(0, seats - this.riders.length), stopped: kmh < 6,
       };
     })() : null;
@@ -479,12 +522,14 @@ export class Game {
     const race = this.raceLine();
     this.hud.setMission(race
       ? `${race}<br><b>${(this.puntos - this.round.startPuntos).toLocaleString('es-MX')}</b> pts · ${seatTxt}`
-      : `<b>${this.puntos.toLocaleString('es-MX')}</b> pts · ${seatTxt}<br>Gym a ${dist}`);
+      : this.net && this.net.status !== 'off'
+        ? `<b>Sala ${this.net.room}</b> · ${this.net.status === 'online' ? `${this.net.remotes.size + 1}/8 jugadores` : 'conectando…'}<br><b>${this.puntos.toLocaleString('es-MX')}</b> pts · ${seatTxt} · Gym a ${dist}`
+        : `<b>${this.puntos.toLocaleString('es-MX')}</b> pts · ${seatTxt}<br>Gym a ${dist}`);
 
     // engine, tires, crash
     const atm = this.atmosphere;
     if (v && !this.droneActive) {
-      const kind = v === this.jeep ? 'jeep' : v === this.moto ? 'moto' : 'boat';
+      const kind = v === this.jeep ? 'jeep' : v === this.boat ? 'boat' : 'moto';
       const lv = v.body.linvel();
       const fwd = v.forwardSpeed();
       const lateral = Math.sqrt(Math.max(0, lv.x * lv.x + lv.z * lv.z - fwd * fwd));
@@ -626,6 +671,12 @@ export class Game {
     } else this.headlight.intensity = 0;
 
     this.updateRace(dt);
+    if (this.net) {
+      const v = p.active;
+      const f2 = p.focus();
+      this.net.update(dt, v ? { x: f2.x, y: f2.y, h: f2.h, heading: v.heading(), speed: v.forwardSpeed() } : null);
+      if (this.net.status === 'online') this.minimap.rivals = this.net.positions();
+    }
     this.updateMission(dt, streamAt.x, streamAt.y);
     this.gym.update(this.elapsed, atm.night);
     this.pins.update(dt, streamAt.x, streamAt.y, cam);

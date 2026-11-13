@@ -44,9 +44,9 @@ export class Hud {
     this.help.innerHTML = `
       <b>Carrera:</b> llega primero al Jungle Gym (línea verde del mapa). Bonus: recoge a quien pide <b>¡AL GYM!</b> y atropella al resto.<br>
       <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / flechas manejar &nbsp; <kbd>Espacio</kbd> freno de mano<br>
-      <kbd>1</kbd> Jeep &nbsp; <kbd>2</kbd> Mototaxi &nbsp; <kbd>3</kbd> Lancha &nbsp; <kbd>E</kbd> subir / bajar<br>
+      <kbd>1</kbd> Jeep &nbsp; <kbd>2</kbd> Mototaxi &nbsp; <kbd>3</kbd> Lancha &nbsp; <kbd>4</kbd> Moto &nbsp; <kbd>E</kbd> subir / bajar<br>
       <kbd>C</kbd> cámara &nbsp; <kbd>F</kbd> dron &nbsp; <kbd>R</kbd> reiniciar &nbsp; <kbd>T</kbd> adelantar hora &nbsp; <kbd>P</kbd> lluvia<br>
-      <kbd>G</kbd> claxon &nbsp; <kbd>M</kbd> sonido &nbsp; <kbd>H</kbd> ocultar ayuda &nbsp; clic para mirar con el mouse`;
+      <kbd>5</kbd>-<kbd>0</kbd> frases en sala &nbsp; <kbd>G</kbd> claxon &nbsp; <kbd>M</kbd> sonido &nbsp; <kbd>H</kbd> ocultar ayuda &nbsp; clic para mirar con el mouse`;
   }
 
   setInfo(html: string) { this.info.innerHTML = html; }

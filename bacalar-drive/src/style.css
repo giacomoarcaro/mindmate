@@ -169,3 +169,10 @@ body.touch .card .big { font-size: 22px; }
 .rs-sub { opacity: 0.7; font-size: 13px; margin-left: 6px; }
 .rs-stats b { font-size: 19px; }
 body.touch #hud-mission .race-clock, body.touch #hud-mission .race-pos { font-size: 14px; }
+
+.rs-mp { margin-top: 12px; }
+.rs-mp-row { margin-top: 10px; }
+.rs-mp-row .rs-btn { flex: 1; margin-top: 0; width: auto; font-size: 14px; padding: 11px 12px; }
+.rs-code-row { display: flex; gap: 8px; margin-top: 10px; }
+.rs-code-row input { flex: 1; text-transform: uppercase; letter-spacing: 0.2em; text-align: center; }
+.rs-code-row .rs-btn { padding: 9px 16px; font-size: 14px; }

@@ -144,6 +144,41 @@ Open Database License.
 - **UI**: heading-up minimap drawn from the same data, speedometer, current street name,
   toasts for nearby named places, OSM credit.
 
+## Multiplayer and hosting
+
+`server/` is a Cloudflare Worker (free plan) with one Durable Object per room. It serves the
+built game and the rooms from the same address:
+https://bacalar-drive.bacalar-drive-server.workers.dev
+
+- Rooms hold up to 8 players. "Partida rápida" joins a public room, "Crear sala" makes a
+  private one and copies an invite link (`?sala=CODE`).
+- Each client simulates its own vehicle and sends its state 10 times a second (once a second
+  when parked). The room relays it, rejects impossible speeds and teleports, and other
+  players are drawn 120 ms in the past with interpolation. Automatic reconnection.
+- Preset phrases only (keys 5 to 0). Only the nickname is shared.
+- Free plan limit: about 100,000 requests a day, and 20 WebSocket messages count as one
+  request. A full room for several hours can exhaust it; multiplayer then pauses until the
+  next day, with no charge.
+
+Deploy (needs a Cloudflare API token with the "Edit Cloudflare Workers" template):
+
+```bash
+npm run build
+```
+```bash
+cd server && npm install && CLOUDFLARE_API_TOKEN=... npm run deploy
+```
+
+`server/build-site.mjs` bundles `dist/` into the Worker. Local test: `npm run dev` in
+`server/` and open http://localhost:8787.
+
+## Vehicles
+
+Keys 1 Jeep, 2 mototaxi, 3 boat, 4 green sport motorcycle (230 km/h, leans into corners).
+Handling: speed-sensitive steering, downforce, yaw damping that prevents spin-outs unless the
+handbrake is pulled (drift), air control, automatic recovery when upside down, and visible
+weight transfer (squat, dive, roll).
+
 ## Graphics
 
 Procedural facades use weathered plaster with stains, cracks and wrought iron window grilles,

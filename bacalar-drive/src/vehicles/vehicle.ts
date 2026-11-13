@@ -103,6 +103,10 @@ export interface CarSpec {
   maxSteer: number;
   maxKmh: number;
   camera: CameraSpec;
+  /** motorcycle: the model leans into corners and the body is held upright more firmly */
+  bike?: boolean;
+  /** downforce coefficient (N per (m/s)^2): keeps fast vehicles planted */
+  downforce?: number;
 }
 
 /** Ray-cast vehicle on Rapier's DynamicRayCastVehicleController. */
@@ -114,6 +118,11 @@ export class Car extends Vehicle {
   private ctrl: RAPIER.DynamicRayCastVehicleController;
   private wheelPivots: THREE.Object3D[] = [];
   private steer = 0;
+  /** visual body attitude driven by acceleration (squat, dive, roll, bike lean) */
+  private bodyPitch = 0;
+  private bodyRoll = 0;
+  private prevV = 0;
+  private flipped = 0;
 
   constructor(physics: Physics, model: VehicleModel, readonly spec: CarSpec) {
     super(physics, model);
@@ -179,9 +188,18 @@ export class Car extends Vehicle {
       brake = 120;
     }
     this.braking = brake > 150;
-    const target = -steer * s.maxSteer / (1 + Math.abs(v) * 0.045);
-    const rate = 2.6 * h;
+    // steering: full lock when slow, narrow and slower at speed; snaps back to center quickly
+    const target = -steer * s.maxSteer / (1 + Math.abs(v) * 0.05);
+    const rate = (Math.abs(target) < Math.abs(this.steer) ? 5.5 : 3.2 - Math.min(1.6, Math.abs(v) * 0.03)) * h;
     this.steer += Math.max(-rate, Math.min(rate, target - this.steer));
+    const grounded = this.wheelsOnGround();
+    // traction: launch wheelspin at low speed, grip falls a little when sliding sideways
+    const lv0 = this.body.linvel();
+    const q0 = this.quaternion();
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(q0);
+    const lateral = lv0.x * right.x + lv0.z * right.z;
+    const slide = Math.min(1, Math.abs(lateral) / 7);
+    this.slip = Math.max(slide, handbrake && Math.abs(v) > 4 ? 1 : 0, throttle > 0.9 && Math.abs(v) < 4 ? 0.6 : 0);
 
     const drives = s.wheels.filter((w) => w.drive).length;
     s.wheels.forEach((w, i) => {
@@ -190,11 +208,48 @@ export class Car extends Vehicle {
       let b = brake;
       if (handbrake && w.rear) b = Math.max(b, s.brakeForce * 0.8);
       this.ctrl.setWheelBrake(i, b / 10);
-      this.ctrl.setWheelFrictionSlip(i, handbrake && w.rear ? s.friction * 0.45 : s.friction);
+      // rear grip drops on the handbrake (drift) and slightly while sliding; fronts keep biting
+      const grip = w.rear ? (handbrake ? 0.42 : 1 - slide * 0.18) : 1 + slide * 0.08;
+      this.ctrl.setWheelFrictionSlip(i, s.friction * grip);
     });
     if (handbrake) this.braking = true;
     this.ctrl.updateVehicle(h, undefined, groups(GROUP_LAND_VEHICLE, GROUP_STATIC));
     this.stabilize(h);
+    const up0 = new THREE.Vector3(0, 1, 0).applyQuaternion(q0);
+    if (grounded > 0) {
+      // downforce presses the car onto the road at speed
+      const df = (s.downforce ?? 0) * v * v * h;
+      if (df > 0) this.body.applyImpulse({ x: -up0.x * df, y: -up0.y * df, z: -up0.z * df }, true);
+      // yaw damping: stops the tail from snapping round unless the driver wants a drift
+      if (!handbrake) {
+        const av = this.body.angvel();
+        const want = Math.abs(v) > 2 ? (v * Math.tan(this.steer)) / 2.7 : 0;
+        const excess = av.y - Math.max(-2.2, Math.min(2.2, want));
+        this.body.applyTorqueImpulse({ x: 0, y: -excess * s.inertia[1] * Math.min(1, 2.2 * h), z: 0 }, true);
+      }
+    } else {
+      // a little air control so jumps land on the wheels
+      const av = this.body.angvel();
+      this.body.setAngvel({ x: av.x * (1 - 1.5 * h), y: av.y * (1 - 0.8 * h), z: av.z * (1 - 1.5 * h) }, true);
+    }
+    // upside down for a while: roll back onto the wheels
+    this.flipped = up0.y < 0.15 && Math.abs(v) < 3 ? this.flipped + h : 0;
+    if (this.flipped > 1.5) {
+      const t = this.body.translation();
+      const yaw = Math.atan2(-(2 * (q0.x * q0.z + q0.w * q0.y)), 1 - 2 * (q0.x * q0.x + q0.y * q0.y));
+      this.body.setTranslation({ x: t.x, y: t.y + 1.2, z: t.z }, true);
+      this.body.setRotation({ x: 0, y: Math.sin(-yaw / 2), z: 0, w: Math.cos(-yaw / 2) }, true);
+      this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      this.flipped = 0;
+    }
+    // visual weight transfer: squat on throttle, dive on brakes, roll (or lean) in corners
+    const acc = (v - this.prevV) / h;
+    this.prevV = v;
+    const latAcc = v * this.body.angvel().y;
+    const k = Math.min(1, 6 * h);
+    this.bodyPitch += (Math.max(-0.07, Math.min(0.07, acc * 0.006)) - this.bodyPitch) * k;
+    const rollTarget = s.bike ? Math.max(-0.75, Math.min(0.75, -latAcc * 0.085)) : Math.max(-0.09, Math.min(0.09, latAcc * 0.007));
+    this.bodyRoll += (rollTarget - this.bodyRoll) * k;
 
     // simple aerodynamic drag
     const lv = this.body.linvel();
@@ -205,6 +260,9 @@ export class Car extends Vehicle {
     }
   }
 
+  /** 0..1 tire slip for sound and effects */
+  slip = 0;
+
   /** Arcade anti-roll: pull the chassis up vector toward world up, damp roll/pitch rates. */
   private stabilize(h: number) {
     const q = this.quaternion();
@@ -213,7 +271,7 @@ export class Car extends Vehicle {
     const av = this.body.angvel();
     const w = new THREE.Vector3(av.x, 0, av.z);
     const grounded = this.wheelsOnGround();
-    const k = grounded >= this.spec.wheels.length - 1 ? 0.5 : 2.0;
+    const k = (grounded >= this.spec.wheels.length - 1 ? 0.5 : 2.0) * (this.spec.bike ? 2.5 : 1);
     const I = this.spec.inertia[2];
     const imp = axis.multiplyScalar(9 * k).sub(w.multiplyScalar(1.6 * k)).multiplyScalar(I * h);
     this.body.applyTorqueImpulse({ x: imp.x, y: 0, z: imp.z }, true);
@@ -229,6 +287,8 @@ export class Car extends Vehicle {
       p.position.set(w.pos[0], w.pos[1] - len, w.pos[2]);
       p.rotation.set(-(this.ctrl.wheelRotation(i) ?? 0), this.ctrl.wheelSteering(i) ?? 0, 0, 'YXZ');
     });
+    // body attitude; a bike leans around its tire contact line
+    this.model.root.rotation.set(this.bodyPitch, 0, this.bodyRoll);
     this.updateBrakeLights();
   }
 }

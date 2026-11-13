@@ -36,6 +36,8 @@ export class RoundScreens {
   private el: HTMLElement;
   onStart: () => void = () => undefined;
   onRestart: () => void = () => undefined;
+  /** join a multiplayer room: 'quick' picks a public room, otherwise the given code */
+  onJoin: (name: string, code: string | 'quick') => void = () => undefined;
 
   constructor() {
     this.el = document.createElement('div');
@@ -46,7 +48,7 @@ export class RoundScreens {
   hide() { this.el.className = ''; this.el.innerHTML = ''; }
   get visible() { return this.el.classList.contains('show'); }
 
-  showStart(rivals: string[], meters: number, best: number | null, touch: boolean) {
+  showStart(rivals: string[], meters: number, best: number | null, touch: boolean, multiplayer = false, invite = '') {
     const logo = drawLogoWide(400).toDataURL();
     this.el.innerHTML = `
       <div class="rs-card">
@@ -59,10 +61,41 @@ export class RoundScreens {
           <li>Bonus: recoge a quien pide <b>¡AL GYM!</b> y atropella al resto para sumar puntos.</li>
         </ul>
         <p class="rs-keys">${touch ? 'Palanca para girar · GAS y FRENO a la derecha' : 'WASD o flechas · Espacio freno de mano · C cámara · G claxon'}</p>
-        <button class="rs-btn rs-primary" id="rs-start">¡A jugar!</button>
+        <button class="rs-btn rs-primary" id="rs-start">${multiplayer ? 'Carrera contra bots' : '¡A jugar!'}</button>
+        ${multiplayer ? `
+        <form class="rs-form rs-mp" id="rs-mp">
+          <p class="rs-form-title">${invite ? `Te invitaron a la sala ${esc(invite)}` : 'Jugar con amigos'}</p>
+          <label for="rs-nick">Tu apodo</label>
+          <input id="rs-nick" maxlength="14" placeholder="Ej. Mariana" autocomplete="nickname" />
+          <div class="rs-row rs-mp-row">
+            ${invite ? `<button class="rs-btn rs-wa" type="submit" data-mode="code">Entrar a la sala ${esc(invite)}</button>` : `
+            <button class="rs-btn rs-wa" type="submit" data-mode="quick">Partida rápida</button>
+            <button class="rs-btn rs-ghost" type="submit" data-mode="new">Crear sala</button>`}
+          </div>
+          <div class="rs-code-row">
+            <input id="rs-room" maxlength="6" placeholder="Código" value="${esc(invite)}" autocapitalize="characters" />
+            <button class="rs-btn rs-ghost" type="submit" data-mode="code">Entrar</button>
+          </div>
+          <small>Hasta 8 jugadores por sala. Solo se comparte tu apodo.</small>
+        </form>` : ''}
       </div>`;
     this.el.className = 'show';
     this.el.querySelector('#rs-start')!.addEventListener('click', () => { this.hide(); this.onStart(); });
+    const mp = this.el.querySelector<HTMLFormElement>('#rs-mp');
+    if (mp) {
+      const nick = mp.querySelector<HTMLInputElement>('#rs-nick')!;
+      try { nick.value = localStorage.getItem('bjg-nick') ?? ''; } catch { /* storage unavailable */ }
+      mp.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const mode = ((e as SubmitEvent).submitter as HTMLElement | null)?.dataset.mode ?? 'quick';
+        const name = nick.value.trim() || 'Jugador';
+        try { localStorage.setItem('bjg-nick', name); } catch { /* storage unavailable */ }
+        const typed = mp.querySelector<HTMLInputElement>('#rs-room')!.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (mode === 'code' && typed.length < 3) { mp.querySelector<HTMLInputElement>('#rs-room')!.focus(); return; }
+        this.hide();
+        this.onJoin(name, mode === 'quick' ? 'quick' : mode === 'new' ? '' : typed);
+      });
+    }
   }
 
   showEnd(r: RoundResult) {

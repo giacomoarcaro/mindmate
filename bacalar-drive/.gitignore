@@ -1,0 +1,5 @@
+node_modules
+dist
+scripts/.cache
+public/facades
+public/data/facades.json

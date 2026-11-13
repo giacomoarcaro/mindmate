@@ -1,0 +1,283 @@
+<title>Vuelo Jungle</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* One-screen arcade game: a single dark tropical look, canvas centered, HUD drawn in canvas. */
+  :root {
+    color-scheme: dark;
+    --bg: #10201a; --ink: #f4f7ee; --lime: #b4e23c; --gold: #ffd23f; --lagoon: #2fb6b8; --char: #20252a;
+    --font: "Arial Black", "Segoe UI", system-ui, sans-serif;
+  }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    padding-block: 8px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+    box-sizing: border-box; overflow: hidden; touch-action: manipulation; -webkit-user-select: none; user-select: none;
+  }
+  canvas { display: block; max-width: 100%; border-radius: 16px; box-shadow: 0 12px 40px rgba(0,0,0,.5); outline: none; cursor: pointer; }
+  canvas:focus-visible { box-shadow: 0 0 0 3px var(--gold), 0 12px 40px rgba(0,0,0,.5); }
+  .bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; font-size: 13px; }
+  .bar a { color: var(--char); background: #25d366; padding: 8px 14px; border-radius: 999px; text-decoration: none; font-weight: 900; }
+  .bar a.site { background: var(--gold); }
+  .bar a:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+  .bar span { opacity: .8; font-family: system-ui, sans-serif; font-weight: 600; }
+</style>
+
+<canvas id="c" width="400" height="600" tabindex="0" aria-label="Vuelo Jungle: toca o pulsa espacio para aletear"></canvas>
+<div class="bar">
+  <span>Toca, clic o Espacio para aletear</span>
+  <a id="wa" href="https://wa.me/393661512335" target="_blank" rel="noopener">Día gratis · WhatsApp</a>
+  <a class="site" href="https://bacalarjunglegym.com/" target="_blank" rel="noopener">bacalarjunglegym.com</a>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  // ---- world (logical units; the canvas is scaled to fit the screen) ----
+  const W = 400, H = 600, GROUND = 70;
+  const GRAVITY = 1500;        // px/s^2
+  const FLAP = -430;           // px/s upward impulse
+  const MAX_FALL = 620;        // terminal velocity
+  const SPEED0 = 150, SPEED_MAX = 205;
+  const GAP0 = 168, GAP_MIN = 126;   // gap shrinks 3 px per point down to GAP_MIN
+  const SPACING = 215;         // distance between obstacles
+  const PW = 62;               // obstacle width
+  const BX = 110, BR = 15;     // bird x and collision radius
+  const STEP = 1 / 120;        // fixed physics step
+
+  const cv = document.getElementById('c');
+  const g = cv.getContext('2d');
+  let best = 0;
+  try { best = Number(localStorage.getItem('vuelo-jungle-best')) || 0; } catch (e) { /* storage unavailable */ }
+
+  function fit() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const s = Math.min((window.innerWidth - 32) / W, (window.innerHeight - 70) / H, 1.4);
+    cv.style.width = Math.floor(W * s) + 'px';
+    cv.style.height = Math.floor(H * s) + 'px';
+    cv.width = Math.floor(W * s * dpr); cv.height = Math.floor(H * s * dpr);
+    g.setTransform(cv.width / W, 0, 0, cv.height / H, 0, 0);
+  }
+  window.addEventListener('resize', fit);
+  fit();
+
+  // ---- state ----
+  let state = 'ready';          // ready | play | over
+  let y, vy, rot, score, pipes, t, flapT, overT, shake, parts, newBest;
+  function reset() {
+    y = H * 0.42; vy = 0; rot = 0; score = 0; pipes = []; t = 0; flapT = 0; overT = 0; shake = 0; parts = []; newBest = false;
+    let x = W + 80, c = H * 0.4;
+    for (let i = 0; i < 4; i++) { c = nextCenter(c, GAP0); pipes.push({ x, c, gap: GAP0, done: false }); x += SPACING; }
+  }
+  // The next gap never moves further than the bird can climb or fall between two obstacles.
+  function nextCenter(prev, gap) {
+    const lo = 60 + gap / 2, hi = H - GROUND - 60 - gap / 2;
+    const reach = 135;
+    const c = prev + (Math.random() * 2 - 1) * reach;
+    return Math.max(lo, Math.min(hi, c));
+  }
+  const gapFor = (n) => Math.max(GAP_MIN, GAP0 - n * 3);
+  const speed = () => Math.min(SPEED_MAX, SPEED0 + score * 2.2);
+
+  // ---- tiny synthesized sounds ----
+  let ac = null;
+  function beep(f, d, type, vol, slide) {
+    try {
+      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      const o = ac.createOscillator(), a = ac.createGain(), n = ac.currentTime;
+      o.type = type || 'square'; o.frequency.setValueAtTime(f, n);
+      if (slide) o.frequency.exponentialRampToValueAtTime(slide, n + d);
+      a.gain.setValueAtTime(vol || 0.06, n); a.gain.exponentialRampToValueAtTime(0.0001, n + d);
+      o.connect(a).connect(ac.destination); o.start(n); o.stop(n + d + 0.02);
+    } catch (e) { /* no audio */ }
+  }
+
+  function tap() {
+    if (state === 'ready') { state = 'play'; flap(); }
+    else if (state === 'play') flap();
+    else if (state === 'over' && overT > 0.45) { reset(); state = 'ready'; }
+  }
+  function flap() {
+    vy = FLAP; flapT = 0.18;
+    beep(520, 0.09, 'triangle', 0.07, 760);
+    for (let i = 0; i < 3; i++) parts.push({ x: BX - 12, y: y + 6, vx: -60 - Math.random() * 60, vy: 40 + Math.random() * 80, life: 0.4, c: '#ffffff' });
+  }
+  cv.addEventListener('pointerdown', (e) => { e.preventDefault(); cv.focus(); tap(); });
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'Enter') { e.preventDefault(); if (!e.repeat) tap(); }
+  });
+
+  function die() {
+    state = 'over'; overT = 0; shake = 0.35;
+    beep(180, 0.35, 'sawtooth', 0.09, 60);
+    for (let i = 0; i < 16; i++) parts.push({ x: BX, y, vx: (Math.random() * 2 - 1) * 220, vy: -Math.random() * 260, life: 0.8, c: i % 2 ? '#ffd23f' : '#b4e23c' });
+    if (score > best) { best = score; newBest = true; try { localStorage.setItem('vuelo-jungle-best', String(best)); } catch (e) { /* ignore */ } }
+    const wa = document.getElementById('wa');
+    wa.href = 'https://wa.me/393661512335?text=' + encodeURIComponent('¡Hola Jungle Gym! Hice ' + score + ' puntos en Vuelo Jungle y quiero mi primer día gratis.');
+  }
+
+  // ---- fixed-step physics ----
+  function step(dt) {
+    t += dt;
+    for (const p of parts) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 600 * dt; p.life -= dt; }
+    parts = parts.filter((p) => p.life > 0);
+    if (state === 'ready') { y = H * 0.42 + Math.sin(t * 3) * 8; rot = 0; return; }
+    if (state === 'over') {
+      overT += dt; shake = Math.max(0, shake - dt);
+      if (y < H - GROUND - BR) { vy = Math.min(MAX_FALL, vy + GRAVITY * dt); y += vy * dt; rot = Math.min(1.5, rot + 6 * dt); }
+      return;
+    }
+    vy = Math.min(MAX_FALL, vy + GRAVITY * dt);
+    y += vy * dt;
+    flapT = Math.max(0, flapT - dt);
+    rot += ((vy < 0 ? -0.42 : Math.min(1.2, vy / 420)) - rot) * Math.min(1, dt * 9);
+    const v = speed();
+    for (const p of pipes) p.x -= v * dt;
+    if (pipes[0].x < -PW) {
+      pipes.shift();
+      const last = pipes[pipes.length - 1];
+      const gap = gapFor(score + pipes.length);
+      pipes.push({ x: last.x + SPACING, c: nextCenter(last.c, gap), gap, done: false });
+    }
+    for (const p of pipes) {
+      if (!p.done && p.x + PW < BX - BR) {
+        p.done = true; score++;
+        beep(880, 0.07, 'square', 0.05); beep(1320, 0.12, 'square', 0.05);
+      }
+      // circle vs the two rectangles of the obstacle
+      const nx = Math.max(p.x, Math.min(BX, p.x + PW));
+      const top = p.c - p.gap / 2, bot = p.c + p.gap / 2;
+      if (nx - BX < BR && BX - nx < BR) {
+        const hitTop = y - BR < top && Math.hypot(BX - nx, y - Math.min(y, top)) < BR;
+        const hitBot = y + BR > bot && Math.hypot(BX - nx, y - Math.max(y, bot)) < BR;
+        if (hitTop || hitBot) { die(); return; }
+      }
+    }
+    if (y + BR >= H - GROUND) { y = H - GROUND - BR; die(); }
+    if (y < -40) { y = -40; vy = 0; }
+  }
+
+  // ---- drawing ----
+  function sky() {
+    const s = g.createLinearGradient(0, 0, 0, H);
+    s.addColorStop(0, '#0e3b52'); s.addColorStop(0.45, '#1f8a8c'); s.addColorStop(0.75, '#f6b26b'); s.addColorStop(1, '#f58f5c');
+    g.fillStyle = s; g.fillRect(0, 0, W, H);
+    // sun over the lagoon
+    g.fillStyle = 'rgba(255, 226, 150, 0.9)'; g.beginPath(); g.arc(300, 430, 46, 0, 7); g.fill();
+    // lagoon bands (the seven colors)
+    const bands = ['#0a3263', '#0f5c93', '#1582b2', '#20a6c4', '#43c9cb', '#86e3d8'];
+    bands.forEach((c, i) => { g.fillStyle = c; g.fillRect(0, 455 + i * 13, W, 14); });
+    // far palms, slow parallax
+    const off = (t * 18) % 130;
+    for (let i = -1; i < 5; i++) palm(i * 130 - off + 40, 470, 0.55, 'rgba(10, 40, 36, 0.55)');
+    const off2 = (t * 42) % 190;
+    for (let i = -1; i < 4; i++) palm(i * 190 - off2 + 90, H - GROUND + 6, 1, '#12352a');
+  }
+  function palm(x, base, s, col) {
+    g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 7 * s; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(x, base); g.quadraticCurveTo(x + 12 * s, base - 50 * s, x + 6 * s, base - 95 * s); g.stroke();
+    for (let k = 0; k < 6; k++) {
+      const a = -Math.PI / 2 + (k - 2.5) * 0.55;
+      g.beginPath(); g.moveTo(x + 6 * s, base - 95 * s);
+      g.quadraticCurveTo(x + 6 * s + Math.cos(a) * 30 * s, base - 95 * s + Math.sin(a) * 30 * s - 8 * s, x + 6 * s + Math.cos(a) * 52 * s, base - 95 * s + Math.sin(a) * 52 * s + 14 * s);
+      g.lineWidth = 5 * s; g.stroke();
+    }
+  }
+  // Obstacle: a column of gym weight plates on a steel bar, capped by a big lime plate.
+  function column(x, y0, y1, capAtBottom) {
+    g.fillStyle = '#8f979c'; g.fillRect(x + PW / 2 - 4, y0, 8, y1 - y0);
+    const colors = ['#20252a', '#2c3338', '#20252a', '#e63946', '#20252a', '#2c3338'];
+    const ph = 22;
+    let i = 0;
+    for (let yy = capAtBottom ? y1 - ph : y0; capAtBottom ? yy > y0 - ph : yy < y1; yy += capAtBottom ? -ph : ph, i++) {
+      const cap = i === 0;
+      const w = cap ? PW + 10 : PW - (i % 2) * 8;
+      g.fillStyle = cap ? '#b4e23c' : colors[i % colors.length];
+      rr(x + PW / 2 - w / 2, yy + 1, w, ph - 2, 7); g.fill();
+      g.fillStyle = 'rgba(255,255,255,0.14)'; g.fillRect(x + PW / 2 - w / 2 + 5, yy + 4, w - 10, 3);
+      if (cap) { g.fillStyle = '#20252a'; g.font = '900 11px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('20 KG', x + PW / 2, yy + ph / 2 + 1); }
+    }
+  }
+  function rr(x, y, w, h, r) { g.beginPath(); g.roundRect(x, y, w, h, r); }
+  // Character: a toucan with a gym headband, drawn with shapes only.
+  function bird() {
+    g.save(); g.translate(BX, y); g.rotate(rot);
+    // tail
+    g.fillStyle = '#14181b'; g.beginPath(); g.moveTo(-12, 0); g.lineTo(-30, -7); g.lineTo(-28, 8); g.closePath(); g.fill();
+    // body and white chest
+    g.fillStyle = '#1b2024'; g.beginPath(); g.ellipse(0, 0, 18, 15, 0, 0, 7); g.fill();
+    g.fillStyle = '#fdf6d8'; g.beginPath(); g.ellipse(7, 5, 10, 9, 0.3, 0, 7); g.fill();
+    // big beak: gold, orange tip, lime stripe
+    g.fillStyle = '#ffd23f'; g.beginPath(); g.moveTo(12, -8); g.quadraticCurveTo(38, -12, 40, 1); g.quadraticCurveTo(30, 8, 13, 4); g.closePath(); g.fill();
+    g.fillStyle = '#f58f1f'; g.beginPath(); g.moveTo(31, -8); g.quadraticCurveTo(40, -6, 40, 1); g.quadraticCurveTo(36, 5, 30, 5); g.closePath(); g.fill();
+    g.strokeStyle = '#7ab317'; g.lineWidth = 2; g.beginPath(); g.moveTo(14, -2); g.quadraticCurveTo(28, -3, 39, 0); g.stroke();
+    // eye
+    g.fillStyle = '#7fe0d8'; g.beginPath(); g.arc(8, -6, 5.5, 0, 7); g.fill();
+    g.fillStyle = '#111'; g.beginPath(); g.arc(9, -6, 2.6, 0, 7); g.fill();
+    // lime headband
+    g.strokeStyle = '#b4e23c'; g.lineWidth = 4; g.beginPath(); g.arc(1, -2, 15.5, -2.5, -0.9); g.stroke();
+    // wing: flaps up right after a tap
+    const up = flapT > 0 ? -1 : Math.sin(t * 14) * 0.25 + 0.5;
+    g.fillStyle = '#2c3338'; g.beginPath(); g.ellipse(-4, 2 + up * 5, 12, 7, -0.4 + up * 0.5, 0, 7); g.fill();
+    g.restore();
+  }
+  function ground() {
+    const gy = H - GROUND;
+    g.fillStyle = '#e9e3cf'; g.fillRect(0, gy, W, GROUND);
+    g.fillStyle = '#b4e23c'; g.fillRect(0, gy, W, 9);
+    g.fillStyle = '#8fb82a';
+    const off = state === 'over' ? 0 : (t * speed()) % 28;
+    for (let x = -off; x < W; x += 28) { g.beginPath(); g.moveTo(x, gy + 9); g.lineTo(x + 14, gy + 9); g.lineTo(x + 7, gy + 17); g.closePath(); g.fill(); }
+    g.fillStyle = 'rgba(32,37,42,0.75)'; g.font = '900 15px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('BACALAR JUNGLE GYM', W / 2, gy + 44);
+  }
+  function text(s, x, yy, size, fill, stroke) {
+    g.font = '900 ' + size + 'px "Arial Black", Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    if (stroke) { g.lineWidth = Math.max(3, size / 7); g.strokeStyle = stroke; g.lineJoin = 'round'; g.strokeText(s, x, yy); }
+    g.fillStyle = fill; g.fillText(s, x, yy);
+  }
+  function draw() {
+    g.save();
+    if (shake > 0) g.translate((Math.random() - 0.5) * 14 * shake, (Math.random() - 0.5) * 14 * shake);
+    sky();
+    for (const p of pipes) { column(p.x, -10, p.c - p.gap / 2, true); column(p.x, p.c + p.gap / 2, H - GROUND, false); }
+    ground();
+    for (const p of parts) { g.globalAlpha = Math.max(0, p.life * 2); g.fillStyle = p.c; g.fillRect(p.x - 2, p.y - 2, 5, 5); }
+    g.globalAlpha = 1;
+    bird();
+    g.restore();
+    if (state === 'play') { text(String(score), W / 2, 70, 58, '#ffffff', '#20252a'); }
+    if (state === 'ready') {
+      text('VUELO', W / 2, 150, 54, '#b4e23c', '#20252a');
+      text('JUNGLE', W / 2, 205, 54, '#ffd23f', '#20252a');
+      text('Toca para aletear', W / 2, 330, 20, '#ffffff', '#20252a');
+      text('Pasa entre las pesas', W / 2, 358, 15, '#ffffff', '#20252a');
+      if (best) text('Récord ' + best, W / 2, 400, 17, '#ffd23f', '#20252a');
+    }
+    if (state === 'over') {
+      const k = Math.min(1, overT / 0.3);
+      g.globalAlpha = k;
+      g.fillStyle = 'rgba(16, 24, 20, 0.86)'; rr(40, 150, W - 80, 250, 20); g.fill();
+      g.strokeStyle = '#b4e23c'; g.lineWidth = 3; rr(40, 150, W - 80, 250, 20); g.stroke();
+      text(newBest ? '¡NUEVO RÉCORD!' : '¡Casi!', W / 2, 188, 26, newBest ? '#ffd23f' : '#ffffff');
+      text(String(score), W / 2, 250, 64, '#b4e23c');
+      text('Récord ' + best, W / 2, 302, 17, '#ffffff');
+      text(score >= 10 ? 'Te ganaste tu día gratis en el gym' : 'Llega a 10 y gana un día gratis', W / 2, 336, 14, '#ffd23f');
+      if (overT > 0.45) text('Toca para volver a jugar', W / 2, 372, 16, '#ffffff');
+      g.globalAlpha = 1;
+    }
+  }
+
+  // ---- loop: fixed time-step, frame-rate independent ----
+  let last = performance.now(), acc = 0;
+  function frame(now) {
+    acc += Math.min(0.1, (now - last) / 1000); last = now;
+    while (acc >= STEP) { step(STEP); acc -= STEP; }
+    draw();
+    requestAnimationFrame(frame);
+  }
+  reset();
+  requestAnimationFrame(frame);
+})();
+</script>

@@ -1,0 +1,24 @@
+name = "bacalar-drive"
+main = "src/worker.ts"
+compatibility_date = "2026-01-01"
+account_id = "11921130c136bbfca282f8ba8018cf92"
+
+# The built game is bundled into the Worker as binary modules (see build-site.mjs)
+rules = [{ type = "Data", globs = ["**/*.bin"], fallthrough = false }]
+
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "Room"
+
+# SQLite-backed Durable Objects are the kind available on the free Workers plan
+[[durable_objects.bindings]]
+name = "BOARD"
+class_name = "Board"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["Board"]

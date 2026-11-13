@@ -191,6 +191,12 @@ or a WhatsApp text) and "Jugar otra vez". The sport bike unlocks after 3 rounds.
 shows a weekly code (staff page `/codigo?k=GYM_SECRET`, secret set with `wrangler secret put`);
 typing it in the menu (`/canjear`) turns the Jeep gold.
 
+## Brinca Bacalar
+
+`games/brinca-bacalar.html` is a self-contained endless lane-hopping game (canvas, no
+libraries), served as `/brinca.html` with the logo embedded. Balance lives in three constants
+at the top of the script: `SPEED_BASE`, `RAIN_SPEED`, `RAMP_ROWS`.
+
 ## Vehicles
 
 Keys 1 Jeep, 2 mototaxi, 3 boat, 4 green sport motorcycle (230 km/h, leans into corners).

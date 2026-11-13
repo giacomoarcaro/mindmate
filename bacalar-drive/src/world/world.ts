@@ -49,9 +49,10 @@ export class World {
   loadRadius = LOAD_RADIUS;
 
   /** `prepare` runs after the raster fields exist and before roads sample terrain heights. */
-  constructor(readonly data: MapData, prepare?: (field: Field) => void) {
+  constructor(readonly data: MapData, prepare?: (field: Field) => void, ground?: Field['ground']) {
     const b = data.meta.bounds;
     this.field = new Field(data);
+    this.field.ground = ground ?? null;
     prepare?.(this.field);
     this.grid = new TileGrid(b.minX, b.minY, b.maxX, b.maxY);
     this.roads = new RoadNetwork(data, this.field, this.grid);

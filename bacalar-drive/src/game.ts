@@ -107,7 +107,7 @@ export class Game {
   private fpsAcc = { t: 0, n: 0, fps: 0 };
   private elapsed = 0;
 
-  constructor(readonly canvas: HTMLCanvasElement, readonly data: MapData) {
+  constructor(readonly canvas: HTMLCanvasElement, readonly data: MapData, readonly ground: { data: Uint8ClampedArray; w: number; h: number; image: HTMLImageElement } | null = null) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !this.isTouch, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.lowQuality ? 1.25 : 1.5));
     this.renderer.shadowMap.enabled = true;
@@ -126,7 +126,7 @@ export class Game {
     await progress('Rasterizing lagoon and terrain…');
     this.landmarks = new Landmarks(this.data);
     this.gym = new GymSite(this.data);
-    this.world = new World(this.data, (field) => { this.landmarks.registerModifiers(field); this.gym.registerModifier(field); });
+    this.world = new World(this.data, (field) => { this.landmarks.registerModifiers(field); this.gym.registerModifier(field); }, this.ground);
     this.gym.markOccupied(this.world.field);
     if (this.lowQuality) this.world.loadRadius = 2;
     this.scene.add(this.world.root);
@@ -149,7 +149,7 @@ export class Game {
     if (this.lowQuality) this.people.max = 18;
     this.pins = new Pins([...this.data.pois, ...this.data.landmarks.filter((l) => !l.kind.startsWith('place:'))], w.field, this.gym);
     this.scene.add(this.landmarks.group, this.rain.mesh, this.gym.group, this.people.group, this.pins.group);
-    this.water = buildWater(w.field);
+    this.water = buildWater(w.field, this.ground?.image ?? null);
     this.scene.add(this.water.mesh);
     await progress('Starting physics…');
     this.physics = await Physics.create(w);
@@ -162,7 +162,7 @@ export class Game {
     }
     this.hud.setBrand(drawLogo(128).toDataURL(), `${BRAND.offer} · WhatsApp|Día gratis · WhatsApp`, whatsappUrl());
     const creditEl = document.querySelector('.credit');
-    if (creditEl) creditEl.textContent = this.data.meta.attribution.replace(/ \(ODbL\)/g, '');
+    if (creditEl) creditEl.textContent = this.data.meta.attribution.replace(/ \(ODbL\)/g, '') + (this.ground ? ' · Sentinel-2 cloudless © EOX (Copernicus 2016)' : '');
     if (this.buildings.facades) {
       const credit = document.querySelector('.credit');
       if (credit) credit.textContent += ` · ${this.buildings.facades.attribution}`;

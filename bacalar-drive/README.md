@@ -153,7 +153,12 @@ wall ads (some advertise the gym with the real distance). Desktop adds ambient o
 40 fps, and `?fx=0` disables post-processing. A drifting cloud layer follows the sun color.
 Phones and `?low` skip post-processing.
 
-Not done yet: satellite ground imagery (license to be chosen) and real facade photos.
+Ground and lagoon colors come from a Sentinel-2 cloudless mosaic (`public/data/ground.jpg`,
+10 m per pixel, downloaded by `scripts/fetch-ground.ts`): "Sentinel-2 cloudless 2016" by EOX
+IT Services GmbH (https://s2maps.eu), contains modified Copernicus Sentinel data 2016,
+CC BY 4.0. Only the 2016 mosaic is used because later ones are non-commercial.
+
+Not done yet: real facade photos.
 
 ## Performance
 

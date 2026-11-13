@@ -11,7 +11,7 @@ const SHADES = ['#c4f5ec', '#86e3d8', '#43c9cb', '#20a6c4', '#1582b2', '#0f5c93'
 // distance from shore (m) at which each shade is reached
 const STOPS = [0, 5, 13, 26, 48, 85, 150];
 
-export function buildWater(field: Field) {
+export function buildWater(field: Field, satellite: HTMLImageElement | null = null) {
   const { nx, ny } = field;
   const tex = new Uint8Array(nx * ny * 4);
   for (let k = 0; k < nx * ny; k++) {
@@ -39,10 +39,19 @@ export function buildWater(field: Field) {
       uSkyColor: { value: new THREE.Color('#9fd3ef') },
       uRain: { value: 0 },
       uShades: { value: SHADES.map((c) => new THREE.Color(c)) },
+      uSat: { value: null },
+      uSatMix: { value: 0 },
       uStops: { value: STOPS },
     },
   ]);
   uniforms.uDist.value = dt;
+  if (satellite) {
+    const st = new THREE.Texture(satellite);
+    st.colorSpace = THREE.SRGBColorSpace;
+    st.needsUpdate = true;
+    uniforms.uSat.value = st;
+    uniforms.uSatMix.value = 0.55;
+  }
   uniforms.uBounds.value.set(field.minX, field.minY, (nx - 1) * 5, (ny - 1) * 5);
 
   const mat = new THREE.ShaderMaterial({
@@ -73,6 +82,8 @@ export function buildWater(field: Field) {
       uniform vec3 uSkyColor;
       uniform float uRain;
       uniform vec3 uShades[7];
+      uniform sampler2D uSat;
+      uniform float uSatMix;
       uniform float uStops[7];
       varying vec3 vWorld;
 
@@ -111,6 +122,12 @@ export function buildWater(field: Field) {
           col = mix(col, uShades[i], k);
         }
 
+        // real lagoon colors from Sentinel-2 (brightened), blended with the seven bands
+        if (uSatMix > 0.0) {
+          vec3 sat = texture2D(uSat, uv).rgb;
+          sat = min(vec3(1.0), sat * 2.2 + vec3(0.0, 0.01, 0.03));
+          col = mix(col, sat, uSatMix * smoothstep(3.0, 20.0, d) * (1.0 - cenote));
+        }
         // normal from wave height field
         float e = 0.6;
         float h0 = waves(m);

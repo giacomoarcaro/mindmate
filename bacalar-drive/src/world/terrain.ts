@@ -24,6 +24,7 @@ function vnoise(x: number, y: number) {
 }
 
 const tmp = new THREE.Color();
+const sat: [number, number, number] = [0, 0, 0];
 
 export function terrainColor(field: Field, x: number, y: number, h: number, out: THREE.Color) {
   const d = field.shoreDist(x, y);
@@ -41,6 +42,14 @@ export function terrainColor(field: Field, x: number, y: number, h: number, out:
   else out.copy(C_GRASS).lerp(C_JUNGLE, Math.min(1, d / 400) * 0.7);
   out.multiplyScalar(0.82 + n * 0.32);
   if (d < 10) out.lerp(C_SAND, 1 - d / 10);
+  // real ground colors from Sentinel-2, brightened (the mosaic is dark) and kept subtle in town
+  if (field.groundColor(x, y, sat)) {
+    const k = lu === LU_RESIDENTIAL ? 0.45 : 0.7;
+    out.r += (Math.min(1, sat[0] * 2.6) - out.r) * k;
+    out.g += (Math.min(1, sat[1] * 2.6) - out.g) * k;
+    out.b += (Math.min(1, sat[2] * 2.6) - out.b) * k;
+    out.multiplyScalar(0.9 + n * 0.2);
+  }
   return out;
 }
 

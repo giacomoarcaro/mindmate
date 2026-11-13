@@ -36,6 +36,24 @@ export class Field {
   readonly landuse: Uint8Array;
   readonly occupied: Uint8Array;
   modifiers: HeightModifier[] = [];
+  /** Sentinel-2 image of the map area (RGBA pixels, north up), if loaded */
+  ground: { data: Uint8ClampedArray; w: number; h: number } | null = null;
+
+  /** Satellite color at a map point as linear RGB 0..1, or null without imagery. */
+  groundColor(x: number, y: number, out: [number, number, number]): boolean {
+    const g = this.ground;
+    if (!g) return false;
+    const u = (x - this.minX) / (this.maxX - this.minX), v = 1 - (y - this.minY) / (this.maxY - this.minY);
+    const fx = Math.max(0, Math.min(g.w - 1.001, u * (g.w - 1))), fy = Math.max(0, Math.min(g.h - 1.001, v * (g.h - 1)));
+    const i = Math.floor(fx), j = Math.floor(fy), tx = fx - i, ty = fy - j;
+    for (let c = 0; c < 3; c++) {
+      const a = g.data[(j * g.w + i) * 4 + c], b = g.data[(j * g.w + i + 1) * 4 + c];
+      const d = g.data[((j + 1) * g.w + i) * 4 + c], e = g.data[((j + 1) * g.w + i + 1) * 4 + c];
+      const s = ((a * (1 - tx) + b * tx) * (1 - ty) + (d * (1 - tx) + e * tx) * ty) / 255;
+      out[c] = Math.pow(s, 2.2); // sRGB to linear
+    }
+    return true;
+  }
 
   constructor(data: MapData) {
     const b = data.meta.bounds;

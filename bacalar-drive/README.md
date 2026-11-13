@@ -87,8 +87,8 @@ letters on the main plaza.
 
 ## Map data
 
-`scripts/fetch-osm.ts` sends one Overpass query for the bounding box
-south 18.63, west -88.43, north 18.73, east -88.34 and checks that it contains the town of
+`scripts/fetch-osm.ts` sends one Overpass query for the center of Bacalar only: a square of
+4 km around the main plaza (about south 18.641, west -88.428, north 18.713, east -88.352) and checks that it contains the town of
 Bacalar, a road named Costera, the Fuerte de San Felipe and Cenote Azul (it widens the box
 and retries if not). It fetches every `highway=*`, `building=*`, `natural=water`,
 `natural=wood`, `landuse=forest`, `landuse=residential`, `leisure=park`, `man_made=pier`,
@@ -143,6 +143,17 @@ Open Database License.
   with darker sky, closer fog and rougher water.
 - **UI**: heading-up minimap drawn from the same data, speedometer, current street name,
   toasts for nearby named places, OSM credit.
+
+## Graphics
+
+Procedural facades use weathered plaster with stains, cracks and wrought iron window grilles,
+a darker foot on every wall, potted plants, bougainvillea, air conditioner boxes and painted
+wall ads (some advertise the gym with the real distance). Desktop adds ambient occlusion
+(GTAO) and a warm color grade; it switches the occlusion off if the frame rate stays under
+40 fps, and `?fx=0` disables post-processing. A drifting cloud layer follows the sun color.
+Phones and `?low` skip post-processing.
+
+Not done yet: satellite ground imagery (license to be chosen) and real facade photos.
 
 ## Performance
 

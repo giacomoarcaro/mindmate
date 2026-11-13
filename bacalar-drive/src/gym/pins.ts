@@ -67,6 +67,7 @@ export class Pins {
     for (let i = 0; i < poolSize; i++) {
       const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ depthWrite: false, transparent: true }));
       sprite.visible = false;
+      sprite.layers.set(1);
       sprite.center.set(0.5, 0);
       this.group.add(sprite);
       this.pool.push({ sprite, poi: null });
@@ -77,6 +78,7 @@ export class Pins {
     this.gymPin.center.set(0.5, 0);
     this.gymPin.position.set(gym.x, gym.h + 13, -gym.y);
     this.gymPin.renderOrder = 6;
+    this.gymPin.layers.set(1);
     this.group.add(this.gymPin);
   }
 

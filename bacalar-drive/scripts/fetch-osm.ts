@@ -21,8 +21,14 @@ const OUT = resolve(ROOT, 'public/data/bacalar.json');
 const CACHE = resolve(ROOT, 'scripts/.cache/overpass-raw.json');
 const ENDPOINT = process.env.OVERPASS_URL ?? 'https://overpass-api.de/api/interpreter';
 
+// Only the center of Bacalar: a square of RADIUS_M around the main plaza (BACALAR letters).
+const CENTER = { lat: 18.67698, lon: -88.38968 };
+const RADIUS_M = 4000;
+const dLat = RADIUS_M / 110574, dLon = RADIUS_M / (111320 * Math.cos((CENTER.lat * Math.PI) / 180));
 // south, west, north, east
-let BBOX: [number, number, number, number] = [18.63, -88.43, 18.73, -88.34];
+let BBOX: [number, number, number, number] = [
+  +(CENTER.lat - dLat).toFixed(5), +(CENTER.lon - dLon).toFixed(5), +(CENTER.lat + dLat).toFixed(5), +(CENTER.lon + dLon).toFixed(5),
+];
 
 // Fuerte de San Felipe, used as projection origin (refined from data when found)
 const FORT_FALLBACK = { lat: 18.67696, lon: -88.38853 };
@@ -197,8 +203,7 @@ async function main() {
   if (offline) {
     if (!existsSync(CACHE)) throw new Error(`No cache at ${CACHE}; run without --offline first`);
     const cached = JSON.parse(readFileSync(CACHE, 'utf8'));
-    els = cached.elements;
-    BBOX = cached.bbox;
+    els = cached.elements; // may cover a larger area; everything is cut to BBOX below
   } else {
     for (let tries = 0; ; tries++) {
       els = await fetchOverpass(BBOX);
@@ -233,6 +238,23 @@ async function main() {
   };
   const [minX, minY] = proj.toLocal(BBOX[0], BBOX[1]);
   const [maxX, maxY] = proj.toLocal(BBOX[2], BBOX[3]);
+  const inside = (x: number, y: number) => x >= minX && x <= maxX && y >= minY && y <= maxY;
+  /** Cuts a polyline into the pieces that lie inside the map. */
+  const clipLine = (pts: number[]): number[][] => {
+    const out: number[][] = [];
+    let cur: number[] = [];
+    for (let i = 0; i < pts.length; i += 2) {
+      if (inside(pts[i], pts[i + 1])) cur.push(pts[i], pts[i + 1]);
+      else { if (cur.length >= 4) out.push(cur); cur = []; }
+    }
+    if (cur.length >= 4) out.push(cur);
+    return out;
+  };
+  const centerOf = (r: number[]): [number, number] => {
+    let x = 0, y = 0;
+    for (let i = 0; i < r.length; i += 2) { x += r[i]; y += r[i + 1]; }
+    return [x / (r.length / 2), y / (r.length / 2)];
+  };
   const clip = (r: Ring) => clipRing(r, minX - 20, minY - 20, maxX + 20, maxY + 20).map(r1);
 
   const polygonsOf = (e: OsmEl): Ring[][] => {
@@ -270,7 +292,7 @@ async function main() {
       if (t.width && !isNaN(parseFloat(t.width))) width = Math.min(14, Math.max(2, parseFloat(t.width)));
       if (t.lanes && /^(primary|secondary)$/.test(cls)) width = Math.max(width, parseInt(t.lanes, 10) * 3.4 || width);
       const surface = t.surface ?? (cls === 'track' ? 'unpaved' : 'paved');
-      roads.push({
+      for (const piece of clipLine(toFlat(e.geometry))) roads.push({
         id: e.id,
         name: t.name ?? t.ref ?? '',
         hw,
@@ -279,7 +301,7 @@ async function main() {
         paved: !(cls === 'track' || UNPAVED.test(surface)),
         bridge: t.bridge === 'yes' || undefined,
         oneway: t.oneway === 'yes' || undefined,
-        pts: toFlat(e.geometry),
+        pts: piece,
       });
       continue;
     }
@@ -287,7 +309,7 @@ async function main() {
       const levels = parseFloat(t['building:levels'] ?? '');
       const height = parseFloat(t.height ?? '');
       for (const poly of polygonsOf(e)) {
-        if (poly[0].length < 6) continue;
+        if (poly[0].length < 6 || !inside(...centerOf(poly[0]))) continue;
         buildings.push({
           id: e.id,
           rings: poly,
@@ -320,6 +342,7 @@ async function main() {
     if (t.man_made === 'pier') {
       if (e.type === 'way' && e.geometry) {
         const pts = toFlat(e.geometry);
+        if (!inside(...centerOf(pts))) continue;
         const closed = e.geometry.length > 3 && e.geometry[0].lat === e.geometry[e.geometry.length - 1].lat && e.geometry[0].lon === e.geometry[e.geometry.length - 1].lon;
         piers.push({ id: e.id, name: t.name || undefined, area: closed || t.area === 'yes' || undefined, pts: closed ? openRing(pts) : pts, width: parseFloat(t.width ?? '') || 2.5 });
       }
@@ -332,6 +355,7 @@ async function main() {
         [x, y] = proj.toLocal(g.reduce((s, p) => s + p.lat, 0) / g.length, g.reduce((s, p) => s + p.lon, 0) / g.length);
       } else continue;
       const kind = t.historic ? `historic:${t.historic}` : t.tourism ? `tourism:${t.tourism}` : t.place ? `place:${t.place}` : `amenity:${t.amenity}`;
+      if (!inside(x, y)) continue;
       const poi: Poi = { name: t.name, kind, x: r1(x), y: r1(y) };
       // keep outlines of historic sites (used to orient and size the fort model)
       if (t.historic && e.type === 'way' && e.geometry && e.geometry.length >= 4) poi.ring = openRing(toFlat(e.geometry));

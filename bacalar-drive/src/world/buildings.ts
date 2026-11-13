@@ -9,7 +9,7 @@ import { facadeTexture, rng, roofTexture, windowGlowTexture } from '../render/te
 import { pushTri } from './roads';
 import type { FacadeStore } from './facades';
 import type { Poi } from '../data/types';
-import { SignAtlas, shopStyle, type ShopStyle } from './shops';
+import { MURALS, SignAtlas, shopStyle, type ShopStyle } from './shops';
 
 /** Colors of the painted band at the foot of the walls (guardapolvo). */
 const TRIM = ['#7a2e2a', '#2f5d50', '#8a5a2b', '#1f4e79', '#5a5a5a', '#b9533a', '#3d6b35'];
@@ -45,6 +45,8 @@ export class BuildingSet implements TileLayer {
   private liveSignMats = new Set<THREE.MeshLambertMaterial>();
   /** Areas where no buildings may be placed (landmarks). x, y, radius */
   exclusions: { x: number; y: number; r: number }[] = [];
+  /** sponsor location, used for the distance painted on wall ads */
+  sponsor: { x: number; y: number } | null = null;
   /** optional real facade photos (Mapillary) */
   facades: FacadeStore | null = null;
 
@@ -211,11 +213,55 @@ export class BuildingSet implements TileLayer {
       const c = new THREE.Color(color);
       for (let q = 0; q < 6; q++) dc.push(c.r, c.g, c.b);
     };
+    // deterministic per-building variety
+    const seed = Math.abs(Math.sin(f.cx * 12.9898 + f.cy * 78.233) * 43758.5453);
+    const rnd = (k: number) => { const v = Math.sin(seed + k * 37.7) * 10000; return v - Math.floor(v); };
+    const cube = (along: number, out: number, h0: number, sx: number, so: number, sh: number, color: string) => {
+      const c = new THREE.Color(color);
+      const corners = [at(along - sx, out - so), at(along + sx, out - so), at(along + sx, out + so), at(along - sx, out + so)];
+      for (let q = 0; q < 4; q++) {
+        const [x0, y0] = corners[q], [x1, y1] = corners[(q + 1) % 4];
+        wallQuad(dp, duv, x0, y0, x1, y1, h0, h0 + sh, 0, 0, 0, 0);
+        for (let v = 0; v < 6; v++) dc.push(c.r, c.g, c.b);
+      }
+      const [a, b, c2, d] = corners;
+      dp.push(a[0], h0 + sh, -a[1], b[0], h0 + sh, -b[1], c2[0], h0 + sh, -c2[1], a[0], h0 + sh, -a[1], c2[0], h0 + sh, -c2[1], d[0], h0 + sh, -d[1]);
+      for (let v = 0; v < 6; v++) { duv.push(0, 0); dc.push(Math.min(1, c.r * 1.1), Math.min(1, c.g * 1.1), Math.min(1, c.b * 1.1)); }
+    };
+    const doorOff = len > 6 ? -len * 0.22 : 0;
+    // potted plants by the door and bougainvillea spilling over the wall
+    const plant = (along: number) => {
+      cube(along, 0.38, gmin, 0.2, 0.2, 0.34, '#b5653a');
+      cube(along, 0.38, gmin + 0.34, 0.3, 0.3, 0.5 + rnd(along) * 0.5, rnd(along + 1) < 0.5 ? '#3f8a3a' : '#57a046');
+    };
+    if (!f.shop && rnd(1) < 0.55) plant(doorOff + 1.15);
+    if (!f.shop && rnd(2) < 0.3) plant(doorOff - 1.2);
+    if (rnd(3) < 0.22 && len > 5) {
+      const col = rnd(4) < 0.6 ? '#d6337c' : '#f08a24';
+      for (let b = 0; b < 4; b++) cube(len * 0.3 + (rnd(5 + b) - 0.5) * 2.2, 0.2, gmin + f.height - 1.2 + rnd(9 + b) * 0.7, 0.55, 0.22, 0.6, b % 2 ? col : '#3f8a3a');
+    }
+    // air conditioner box high on the wall
+    if (rnd(6) < 0.28 && len > 4.5) cube(len * 0.18, 0.2, gmin + 2.35, 0.42, 0.2, 0.3, '#d9dcde');
+    // painted wall ad on a blank stretch; some advertise the gym with its distance
+    if (!f.shop && len > 7 && rnd(7) < 0.16) {
+      const m = MURALS[Math.floor(rnd(8) * MURALS.length)];
+      let sub = '';
+      if (m.gym && this.sponsor) {
+        const d = Math.hypot(this.sponsor.x - f.cx, this.sponsor.y - f.cy);
+        sub = d < 950 ? `A ${Math.max(50, Math.round(d / 50) * 50)} m de aquí` : `A ${(d / 1000).toFixed(1)} km de aquí`;
+      }
+      const cell = atlas().addMural(m, sub);
+      if (cell) {
+        const mw = Math.min(len * 0.55, 5.2), mh = mw / 4;
+        const c0 = len * 0.2;
+        const [x0, y0] = at(c0 - mw / 2, 0.05), [x1, y1] = at(c0 + mw / 2, 0.05);
+        wallQuad(sp, suv, x0, y0, x1, y1, gmin + 1.05, gmin + 1.05 + mh, cell.u0, cell.u1, cell.v0, cell.v1);
+      }
+    }
     if (!f.shop) {
-      // a wooden door, off center
-      const off = len > 6 ? -len * 0.22 : 0;
-      quad(off - 0.55, off + 0.55, gmin, gmin + 2.15, 0.06, '#5b3a22');
-      quad(off - 0.65, off + 0.65, gmin + 2.15, gmin + 2.3, 0.07, '#e9e4d8');
+      // a wooden door with a painted frame, off center
+      quad(doorOff - 0.55, doorOff + 0.55, gmin, gmin + 2.15, 0.06, rnd(10) < 0.5 ? '#5b3a22' : '#2f4a3c');
+      quad(doorOff - 0.65, doorOff + 0.65, gmin + 2.15, gmin + 2.3, 0.07, '#e9e4d8');
       return;
     }
     const s = f.shop.style;
@@ -307,7 +353,9 @@ export class BuildingSet implements TileLayer {
           const v0 = (base - gmax) / 3, v1 = (top - 0.4 - gmax) / 3;
           // outward normal for a CCW outer / CW hole ring is (dy, -dx)
           wallQuad(wp, wuv, ax, ay, bx, by, base, top, u0, u1, v0, v1);
-          for (let q = 0; q < 6; q++) wc.push(f.color.r, f.color.g, f.color.b);
+          // darker at the foot, lighter at the top: cheap ambient occlusion and grime
+          // (vertex order of wallQuad: bottom, bottom, top, bottom, top, top)
+          for (const lit of [0.72, 0.72, 1.04, 0.72, 1.04, 1.04]) wc.push(f.color.r * lit, f.color.g * lit, f.color.b * lit);
           if (photo && ring === f.ring && k === photo.wall) {
             const cell = atlas!.reserve(photo.photo, photo.left, f.color);
             if (cell) {

@@ -30,6 +30,8 @@ import { People } from './gym/people';
 import { Pins } from './gym/pins';
 import { BRAND, drawLogo, whatsappUrl } from './gym/brand';
 import { Sound } from './audio';
+import { Effects } from './render/fx';
+import { Clouds } from './env/clouds';
 import { RoundScreens, fmtTime } from './ui/round';
 import { Race } from './gym/race';
 import { figure, type Kind } from './gym/people';
@@ -67,11 +69,14 @@ export class Game {
   /** kinds of the people riding with the player */
   private riders: Kind[] = [];
   readonly sound = new Sound();
+  fx!: Effects;
+  clouds = new Clouds();
   /** arcade score for knocking people over, with a short combo window */
   puntos = 0;
   private combo = 0;
   private comboTimer = 0;
   private lastKmh = 0;
+  private slowFrames = 0;
   /** race from the plaza to the gym against three rivals; TIME_LIMIT ends it */
   readonly TIME_LIMIT = 300;
   race!: Race;
@@ -131,6 +136,7 @@ export class Game {
     this.buildings = new BuildingSet(this.data, w.field, w.roads, w.grid, [...this.landmarks.exclusions(), this.gym.exclusion()]);
     this.buildings.facades = await FacadeStore.load(import.meta.env.BASE_URL);
     this.buildings.assignShops(this.data.pois);
+    this.buildings.sponsor = { x: this.gym.x, y: this.gym.y };
     this.vegetation = new Vegetation(w.field);
     if (this.lowQuality) this.vegetation.spacing = 8.5;
     this.streetLights = new StreetLights(w.roads, w.field, w.grid);
@@ -211,6 +217,9 @@ export class Game {
     this.sun.shadow.bias = -0.0004;
     this.sun.shadow.normalBias = 0.6;
     this.scene.add(this.sun, this.sun.target, this.hemi);
+    this.scene.add(this.clouds.mesh);
+    this.fx = new Effects(this.renderer, this.scene, this.camera, !this.lowQuality);
+    this.resize();
     this.atmosphere = new Atmosphere(this.scene, this.sky, this.sun, this.hemi, this.renderer);
     if (this.lowQuality) this.atmosphere.fogScale = 0.72;
     this.headlight.position.set(0, 1.2, -1.5);
@@ -318,6 +327,7 @@ export class Game {
   private resize() {
     const w = window.innerWidth, h = window.innerHeight;
     this.renderer.setSize(w, h, false);
+    this.fx?.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
   }
@@ -599,6 +609,7 @@ export class Game {
     wu.uRain.value = atm.rain;
     wu.uSunColor.value.copy(this.sun.color);
     this.vegetation.time.value = this.elapsed;
+    this.clouds.update(this.elapsed, cam, this.sun.color, atm.day, atm.rain);
     this.streetLights.setNight(atm.night);
     this.buildings.setNight(atm.night);
     this.rain.update(this.elapsed, cam, atm.rain);
@@ -641,11 +652,12 @@ export class Game {
     this.fpsAcc.t += dt; this.fpsAcc.n++;
     if (this.fpsAcc.t > 0.5) {
       this.fpsAcc.fps = Math.round(this.fpsAcc.n / this.fpsAcc.t);
+      if (this.elapsed > 8) { this.slowFrames = this.fpsAcc.fps < 40 ? this.slowFrames + 1 : 0; if (this.slowFrames === 6) this.fx.setAo(false); }
       this.fpsAcc.t = 0; this.fpsAcc.n = 0;
       this.hud.setInfo(`<b>${atm.clock()}</b> &nbsp;Bacalar<br>${this.fpsAcc.fps} fps · ${this.droneActive ? 'drone' : this.rig.mode} camera`);
     }
 
-    this.renderer.render(this.scene, this.camera);
+    this.fx.render();
     input.endFrame();
   }
 }

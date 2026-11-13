@@ -65,6 +65,7 @@ export class Rain {
     this.mesh = new THREE.LineSegments(g, mat);
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 10;
+    this.mesh.layers.set(1);
   }
 
   update(time: number, cam: THREE.Vector3, intensity: number) {

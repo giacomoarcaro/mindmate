@@ -142,6 +142,8 @@ export class GymSite {
     );
     this.beacon.position.set(0, H + 130, 0);
     this.beacon.renderOrder = 4;
+    this.beacon.layers.set(1);
+    this.ring.layers.set(1);
     g.add(this.beacon);
 
     const yaw = Math.atan2(this.ux, -this.uy);

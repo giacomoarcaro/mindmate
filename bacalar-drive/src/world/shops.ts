@@ -54,6 +54,49 @@ function drawSign(g: CanvasRenderingContext2D, x: number, y: number, name: strin
   g.fillText(label, x + CW / 2, y + 78, CW - 40);
 }
 
+/** Painted wall ads seen all over Mexican towns. `gym` entries advertise the sponsor. */
+export const MURALS: { top: string; main: string; bg: string; fg: string; accent: string; gym?: boolean }[] = [
+  { top: 'ENTRENA EN', main: 'JUNGLE GYM', bg: '#17251c', fg: '#b4e23c', accent: '#ffd23f', gym: true },
+  { top: 'TU PRIMER DÍA GRATIS', main: 'JUNGLE GYM', bg: '#b4e23c', fg: '#17251c', accent: '#c8372d', gym: true },
+  { top: 'FUNCIONAL · HIIT · PESAS', main: 'JUNGLE GYM', bg: '#f4f1ea', fg: '#1f8a4c', accent: '#20252a', gym: true },
+  { top: 'AQUÍ', main: 'TORTILLERÍA', bg: '#f1d77a', fg: '#7a2e2a', accent: '#1f4e79' },
+  { top: 'SE VENDE', main: 'HIELO', bg: '#e9f4fb', fg: '#1f4e79', accent: '#c8372d' },
+  { top: 'ABARROTES', main: 'LA LAGUNA', bg: '#c8372d', fg: '#fff7e0', accent: '#ffd23f' },
+  { top: 'RICAS', main: 'PALETAS', bg: '#ff8fb8', fg: '#ffffff', accent: '#5b3a24' },
+  { top: 'SE RENTA', main: 'CUARTOS', bg: '#f4f1ea', fg: '#20252a', accent: '#c8372d' },
+  { top: 'TOURS EN', main: 'LANCHA', bg: '#3fb8af', fg: '#ffffff', accent: '#ffd23f' },
+  { top: 'VULCANIZADORA', main: 'EL GÜERO', bg: '#20252a', fg: '#ffd23f', accent: '#ffffff' },
+  { top: 'COCOS', main: 'FRÍOS', bg: '#2e7d32', fg: '#ffffff', accent: '#ffd23f' },
+];
+
+/** Hand-lettered mural: slanted shadowed letters straight on the plaster, a little faded. */
+function drawMural(g: CanvasRenderingContext2D, x: number, y: number, m: (typeof MURALS)[number], sub: string) {
+  g.save();
+  g.beginPath(); g.rect(x, y, CW, CH); g.clip();
+  g.fillStyle = m.bg; g.fillRect(x, y, CW, CH);
+  g.fillStyle = m.accent; g.fillRect(x, y + CH - 12, CW, 12); g.fillRect(x, y, CW, 6);
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = 'italic 700 22px Georgia, "Times New Roman", serif';
+  g.fillStyle = m.accent;
+  g.fillText(m.top, x + CW / 2, y + 26, CW - 30);
+  let size = 62;
+  g.font = `italic 900 ${size}px "Arial Black", Arial, sans-serif`;
+  while (g.measureText(m.main).width > CW - 50 && size > 26) { size -= 2; g.font = `italic 900 ${size}px "Arial Black", Arial, sans-serif`; }
+  g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillText(m.main, x + CW / 2 + 4, y + 70 + 4);
+  g.fillStyle = m.fg; g.fillText(m.main, x + CW / 2, y + 70);
+  if (sub) {
+    g.font = '800 18px Arial, sans-serif';
+    g.fillStyle = m.accent;
+    g.fillText(sub, x + CW / 2, y + 104, CW - 30);
+  }
+  // sun-faded, flaking paint
+  for (let i = 0; i < 160; i++) {
+    g.fillStyle = `rgba(240,236,226,${0.08 + Math.random() * 0.25})`;
+    g.fillRect(x + Math.random() * CW, y + Math.random() * CH, 2 + Math.random() * 9, 1 + Math.random() * 4);
+  }
+  g.restore();
+}
+
 /** One canvas atlas of signs per tile. */
 export class SignAtlas {
   readonly tex: THREE.CanvasTexture;
@@ -76,6 +119,17 @@ export class SignAtlas {
     const x = (this.used % COLS) * CW, y = Math.floor(this.used / COLS) * CH;
     this.used++;
     drawSign(this.g, x, y, name, s);
+    this.tex.needsUpdate = true;
+    const W = CW * COLS, H = CH * ROWS, e = 1 / W;
+    return { u0: x / W + e, u1: (x + CW) / W - e, v0: 1 - (y + CH) / H + e, v1: 1 - y / H - e };
+  }
+
+  /** Draws a painted wall ad and returns its UV rectangle, or null when the atlas is full. */
+  addMural(m: (typeof MURALS)[number], sub: string) {
+    if (this.used >= COLS * ROWS) return null;
+    const x = (this.used % COLS) * CW, y = Math.floor(this.used / COLS) * CH;
+    this.used++;
+    drawMural(this.g, x, y, m, sub);
     this.tex.needsUpdate = true;
     const W = CW * COLS, H = CH * ROWS, e = 1 / W;
     return { u0: x / W + e, u1: (x + CW) / W - e, v0: 1 - (y + CH) / H + e, v1: 1 - y / H - e };

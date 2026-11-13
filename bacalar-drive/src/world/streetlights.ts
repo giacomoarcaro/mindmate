@@ -93,6 +93,7 @@ export class StreetLights implements TileLayer {
     });
     poles.castShadow = true;
     pools.renderOrder = 3;
+    pools.layers.set(1);
     for (const im of [poles, heads, pools]) im.computeBoundingSphere();
     tile.group.add(poles, heads, pools);
     const prev = tile.dispose;

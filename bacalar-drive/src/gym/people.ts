@@ -218,6 +218,7 @@ export class People {
         npc.marker = new THREE.Sprite(this.markerMat);
         npc.marker.scale.set(2.4, 1.5, 1);
         npc.marker.position.y = 3.1;
+        npc.marker.layers.set(1);
         fig.root.add(npc.marker);
       }
       this.group.add(fig.root);

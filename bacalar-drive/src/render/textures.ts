@@ -115,18 +115,56 @@ export function stoneTexture() {
 
 /** Facade: white base with windows, tinted by vertex colors. 1 texture unit = 3 m wide x 3 m tall. */
 export function facadeTexture() {
-  return canvasTex(256, (g, s) => {
-    speckle(g, s, '#f4f1ea', ['#e6e1d6', '#ffffff', '#ddd7ca'], 3000, 6);
-    // window
-    g.fillStyle = '#3d4a52';
-    g.fillRect(s * 0.32, s * 0.3, s * 0.36, s * 0.42);
-    g.fillStyle = '#7b8f99';
-    g.fillRect(s * 0.34, s * 0.32, s * 0.15, s * 0.38);
-    g.fillStyle = '#e6e1d6';
-    g.fillRect(s * 0.3, s * 0.72, s * 0.4, s * 0.04);
-    // base trim
-    g.fillStyle = 'rgba(0,0,0,0.12)';
-    g.fillRect(0, s * 0.94, s, s * 0.06);
+  return canvasTex(512, (g, s) => {
+    speckle(g, s, '#f4f1ea', ['#e6e1d6', '#ffffff', '#ddd7ca'], 9000, 6, 2.4);
+    const r = rng(21);
+    // rain streaks and damp stains running down the plaster
+    for (let i = 0; i < 26; i++) {
+      const x = r() * s, w = 3 + r() * 14, h = s * (0.15 + r() * 0.5);
+      const grad = g.createLinearGradient(0, 0, 0, h);
+      grad.addColorStop(0, `rgba(70,62,50,${0.05 + r() * 0.09})`);
+      grad.addColorStop(1, 'rgba(70,62,50,0)');
+      g.fillStyle = grad;
+      g.fillRect(x, 0, w, h);
+    }
+    // peeled patches showing older paint and bare block
+    for (let i = 0; i < 9; i++) {
+      g.fillStyle = r() < 0.5 ? `rgba(150,140,125,${0.25 + r() * 0.25})` : `rgba(255,255,255,${0.25 + r() * 0.3})`;
+      g.beginPath();
+      const cx = r() * s, cy = r() * s;
+      for (let k = 0; k < 7; k++) {
+        const a = (k / 7) * Math.PI * 2, rad = 6 + r() * 20;
+        g.lineTo(cx + Math.cos(a) * rad * 1.6, cy + Math.sin(a) * rad);
+      }
+      g.fill();
+    }
+    // hairline cracks
+    g.strokeStyle = 'rgba(60,55,48,0.35)';
+    g.lineWidth = 1;
+    for (let i = 0; i < 5; i++) {
+      let x = r() * s, y = r() * s * 0.6;
+      g.beginPath(); g.moveTo(x, y);
+      for (let k = 0; k < 6; k++) { x += (r() - 0.5) * 26; y += 10 + r() * 22; g.lineTo(x, y); }
+      g.stroke();
+    }
+    // window: recessed frame, glass, and a wrought iron grille (reja)
+    const wx = s * 0.3, wy = s * 0.27, ww = s * 0.4, wh = s * 0.44;
+    g.fillStyle = '#d9d2c2'; g.fillRect(wx - 8, wy - 8, ww + 16, wh + 16);
+    g.fillStyle = '#2f3a40'; g.fillRect(wx, wy, ww, wh);
+    g.fillStyle = '#566c76'; g.fillRect(wx + 4, wy + 4, ww / 2 - 6, wh - 8);
+    g.fillStyle = 'rgba(255,255,255,0.10)'; g.fillRect(wx + 8, wy + 8, ww / 4, wh / 3);
+    g.strokeStyle = '#17191b'; g.lineWidth = 3;
+    for (let k = 0; k <= 6; k++) { const x = wx + (ww * k) / 6; g.beginPath(); g.moveTo(x, wy - 4); g.lineTo(x, wy + wh + 4); g.stroke(); }
+    for (const fy of [0.18, 0.5, 0.82]) { g.beginPath(); g.moveTo(wx - 4, wy + wh * fy); g.lineTo(wx + ww + 4, wy + wh * fy); g.stroke(); }
+    // sill with a dirt streak under it
+    g.fillStyle = '#cfc8b8'; g.fillRect(wx - 14, wy + wh + 8, ww + 28, 9);
+    const grad = g.createLinearGradient(0, wy + wh + 17, 0, wy + wh + 70);
+    grad.addColorStop(0, 'rgba(60,55,45,0.22)'); grad.addColorStop(1, 'rgba(60,55,45,0)');
+    g.fillStyle = grad; g.fillRect(wx - 6, wy + wh + 17, ww + 12, 53);
+    // splash-back grime at the foot of the wall
+    const base = g.createLinearGradient(0, s * 0.86, 0, s);
+    base.addColorStop(0, 'rgba(60,50,40,0)'); base.addColorStop(1, 'rgba(60,50,40,0.28)');
+    g.fillStyle = base; g.fillRect(0, s * 0.86, s, s * 0.14);
   });
 }
 
@@ -136,7 +174,7 @@ export function windowGlowTexture() {
     g.fillStyle = '#000';
     g.fillRect(0, 0, s, s);
     g.fillStyle = '#ffcf7a';
-    g.fillRect(s * 0.34, s * 0.32, s * 0.32, s * 0.38);
+    g.fillRect(s * 0.3, s * 0.27, s * 0.4, s * 0.44);
   });
 }
 

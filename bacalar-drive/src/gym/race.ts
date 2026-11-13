@@ -143,6 +143,7 @@ function labelSprite(text: string, color: string) {
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthWrite: false }));
   s.scale.set(2.2, 0.55, 1);
   s.position.y = 3.2;
+  s.layers.set(1);
   return s;
 }
 

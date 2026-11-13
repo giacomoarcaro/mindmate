@@ -25,6 +25,8 @@ export class Minimap {
   /** race route to the gym and rival positions */
   route: [number, number][] = [];
   rivals: [number, number][] = [];
+  /** golden dumbbell of the party mode */
+  gold: [number, number] | null = null;
 
   constructor(host: HTMLElement, private field: Field, private roads: RoadNetwork, buildings: Footprint[], private landmarks: Poi[]) {
     this.canvas = document.createElement('canvas');
@@ -153,6 +155,13 @@ export class Minimap {
       c.lineWidth = 3;
       c.beginPath(); c.arc((rx - x) * s, -(ry - y) * s, 8, 0, Math.PI * 2); c.fill(); c.stroke();
     });
+    if (this.gold) {
+      let gx2 = (this.gold[0] - x) * s, gy2 = -(this.gold[1] - y) * s;
+      const gd2 = Math.hypot(gx2, gy2);
+      if (gd2 > R - 24) { gx2 = (gx2 / gd2) * (R - 24); gy2 = (gy2 / gd2) * (R - 24); }
+      c.fillStyle = '#ffd23f'; c.strokeStyle = '#20252a'; c.lineWidth = 4;
+      c.beginPath(); c.arc(gx2, gy2, 12, 0, Math.PI * 2); c.fill(); c.stroke();
+    }
     // people who want a ride to the gym
     c.fillStyle = '#b4e23c';
     c.strokeStyle = '#20252a';

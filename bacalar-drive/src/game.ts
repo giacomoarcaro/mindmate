@@ -35,6 +35,7 @@ import { Clouds } from './env/clouds';
 import { RoundScreens, fmtTime } from './ui/round';
 import { Race } from './gym/race';
 import { Net, PHRASES, randomRoom, serverUrl } from './net/net';
+import { Mancuerna } from './gym/mancuerna';
 import { figure, type Kind } from './gym/people';
 
 type Progress = (msg: string) => Promise<void>;
@@ -83,6 +84,7 @@ export class Game {
   readonly TIME_LIMIT = 300;
   race!: Race;
   net: Net | null = null;
+  mancuerna: Mancuerna | null = null;
   private quickN = 1;
   private round = { phase: 'idle' as 'idle' | 'countdown' | 'racing' | 'done', countdown: 0, time: 0, socios: 0, hits: 0, startPuntos: 0, lastBeep: 0 };
   private best: number | null = null;
@@ -197,6 +199,9 @@ export class Game {
       this.net = new Net(mpUrl, w.field);
       this.scene.add(this.net.group);
       this.screens.onJoin = (name, code) => this.joinRoom(name, code);
+      this.mancuerna = new Mancuerna(this.net, this.race, w.field, w.roads, this.hud, this.sound, this.minimap, this.spawn);
+      this.scene.add(this.mancuerna.group);
+      this.mancuerna.onOver = (rows, won) => this.screens.showParty('La Mancuerna de Oro', rows, won);
       this.net.onChat = (name, text) => this.hud.message(`${name}: ${text}`, 3);
       this.net.onStatus = (s) => {
         if (s === 'full') {
@@ -396,6 +401,7 @@ export class Game {
       this.hud.message(this.atmosphere.rainTarget ? 'Lluvia' : 'Sin lluvia');
     }
     if (input.wasPressed('KeyG')) this.sound.horn();
+    if (this.net?.status === 'online' && input.wasPressed('Enter') && !this.mancuerna?.active() && !this.screens.visible) this.mancuerna?.start();
     if (this.net?.status === 'online') {
       ['Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0'].forEach((code, i) => {
         if (input.wasPressed(code)) { this.net!.chat(i); this.hud.message(`Tú: ${PHRASES[i]}`, 2); }
@@ -522,8 +528,9 @@ export class Game {
     const race = this.raceLine();
     this.hud.setMission(race
       ? `${race}<br><b>${(this.puntos - this.round.startPuntos).toLocaleString('es-MX')}</b> pts · ${seatTxt}`
+      : this.mancuerna?.active() ? this.mancuerna.line()
       : this.net && this.net.status !== 'off'
-        ? `<b>Sala ${this.net.room}</b> · ${this.net.status === 'online' ? `${this.net.remotes.size + 1}/8 jugadores` : 'conectando…'}<br><b>${this.puntos.toLocaleString('es-MX')}</b> pts · ${seatTxt} · Gym a ${dist}`
+        ? `<b>Sala ${this.net.room}</b> · ${this.net.status === 'online' ? `${this.net.remotes.size + 1}/8 jugadores` : 'conectando…'}<br><b>Enter</b>: jugar La Mancuerna de Oro · Gym a ${dist}`
         : `<b>${this.puntos.toLocaleString('es-MX')}</b> pts · ${seatTxt}<br>Gym a ${dist}`);
 
     // engine, tires, crash
@@ -676,6 +683,7 @@ export class Game {
       const f2 = p.focus();
       this.net.update(dt, v ? { x: f2.x, y: f2.y, h: f2.h, heading: v.heading(), speed: v.forwardSpeed() } : null);
       if (this.net.status === 'online') this.minimap.rivals = this.net.positions();
+      this.mancuerna?.update(dt, this.elapsed, f2);
     }
     this.updateMission(dt, streamAt.x, streamAt.y);
     this.gym.update(this.elapsed, atm.night);

@@ -172,6 +172,15 @@ cd server && npm install && CLOUDFLARE_API_TOKEN=... npm run deploy
 `server/build-site.mjs` bundles `dist/` into the Worker. Local test: `npm run dev` in
 `server/` and open http://localhost:8787.
 
+## Party mode: La Mancuerna de Oro
+
+In a room, Enter (or the "Mancuerna" touch button) starts a 2 minute round. A golden dumbbell
+appears on a street near the plaza; whoever carries it scores 10 points a second, and
+touching the carrier steals it (1.5 s of protection after each change). The server owns the
+dumbbell, the scores and the clock. With fewer than three people the host's client drives two
+bots along the street graph. The round ends with a ranking, a prize code for the winner and
+the WhatsApp lead form.
+
 ## Vehicles
 
 Keys 1 Jeep, 2 mototaxi, 3 boat, 4 green sport motorcycle (230 km/h, leans into corners).

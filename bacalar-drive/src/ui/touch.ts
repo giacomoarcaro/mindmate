@@ -35,6 +35,7 @@ export class TouchControls {
         <button class="tc-btn tc-small" data-key="Digit3">Lancha</button>
         <button class="tc-btn tc-small" data-key="KeyR">Reinicio</button>
         <button class="tc-btn tc-small" data-key="KeyG">Claxon</button>
+        <button class="tc-btn tc-small tc-gold" data-key="Enter">Mancuerna</button>
         <button class="tc-btn tc-small" data-key="KeyM">Sonido</button>
         <button class="tc-btn tc-small" id="tc-full">Pantalla</button>
       </div>

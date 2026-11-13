@@ -153,7 +153,7 @@ function labelSprite(text: string, color: string) {
  */
 export class Race {
   readonly group = new THREE.Group();
-  private graph: RoadGraph;
+  readonly graph: RoadGraph;
   rivals: Rival[] = [];
   readonly routeLength: number;
 

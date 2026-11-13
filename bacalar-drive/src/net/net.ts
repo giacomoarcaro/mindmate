@@ -27,6 +27,8 @@ export function randomRoom() {
 type State = [number, number, number, number, number]; // x, y, h, heading, speed
 interface PlayerInfo { id: number; name: string; veh: number; p: State }
 
+export interface PartyState { phase: 'idle' | 'play' | 'over'; left: number; holder: number; ball: [number, number]; scores: { id: number; name: string; pts: number }[] }
+
 interface Remote {
   info: PlayerInfo;
   object: THREE.Group;
@@ -73,8 +75,10 @@ export class Net {
   onStatus: (s: Net['status']) => void = () => undefined;
   onChat: (name: string, text: string) => void = () => undefined;
   onRoster: () => void = () => undefined;
+  /** "Mancuerna de Oro" state, owned by the server */
+  party: PartyState | null = null;
+  name = 'Jugador';
   private ws: WebSocket | null = null;
-  private name = 'Jugador';
   private veh = 0;
   private sendTimer = 0;
   private last: State | null = null;
@@ -95,6 +99,7 @@ export class Net {
     this.ws?.close();
     this.ws = null;
     for (const id of [...this.remotes.keys()]) this.remove(id);
+    this.party = null;
     this.setStatus('off');
   }
 
@@ -144,6 +149,8 @@ export class Net {
         r.buf.push({ t: performance.now() / 1000, p: m.p as State });
         if (r.buf.length > 12) r.buf.shift();
       }
+    } else if (m.t === 'g') {
+      this.party = m as unknown as PartyState;
     } else if (m.t === 'chat') {
       const r = this.remotes.get(m.id!);
       const text = PHRASES[m.i ?? 0];
@@ -183,6 +190,26 @@ export class Net {
     r.bubble.position.y = 3.9;
     r.object.add(r.bubble);
     r.bubbleUntil = performance.now() / 1000 + 3.5;
+  }
+
+  startParty(spots: [number, number][]) {
+    if (this.status === 'online') this.ws?.send(JSON.stringify({ t: 'start', spots }));
+  }
+
+  sendBot(i: number, p: State) {
+    if (this.status === 'online' && this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify({ t: 'bot', i, p }));
+  }
+
+  /** True when this client has the lowest id in the room: it drives the bots. */
+  isHost() {
+    for (const id of this.remotes.keys()) if (id < 90 && id < this.myId) return false;
+    return true;
+  }
+
+  realPlayers() {
+    let n = 1;
+    for (const id of this.remotes.keys()) if (id < 90) n++;
+    return n;
   }
 
   chat(i: number) {

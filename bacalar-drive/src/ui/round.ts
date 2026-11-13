@@ -98,6 +98,54 @@ export class RoundScreens {
     }
   }
 
+  /** Ranking of a party round, with the same WhatsApp lead form. */
+  showParty(title: string, rows: { name: string; pts: number; me: boolean }[], won: boolean) {
+    const code = prizeCode();
+    const mine = rows.find((r) => r.me);
+    const place = rows.findIndex((r) => r.me) + 1;
+    this.el.innerHTML = `
+      <div class="rs-card rs-end">
+        <h1>${won ? '¡Ganaste!' : `Quedaste ${place}º de ${rows.length}`}</h1>
+        <p class="rs-lead">${esc(title)}${won ? `<br>Tu premio: <b>${BRAND.offer.toLowerCase()}</b> en el Jungle Gym.` : '<br>Igual puedes probar el gym: el primer día es gratis.'}</p>
+        ${won ? `<div class="rs-code">Tu código <b>${code}</b></div>` : ''}
+        <ol class="rs-rank">${rows.slice(0, 8).map((r, i) => `<li class="${r.me ? 'me' : ''}"><span>${i + 1}. ${esc(r.name)}</span><b>${r.pts}</b></li>`).join('')}</ol>
+        <form class="rs-form" id="rs-form" autocomplete="on">
+          <p class="rs-form-title">${won ? 'Reclama tu día gratis por WhatsApp' : 'Reserva tu día gratis por WhatsApp'}</p>
+          <label for="rs-name">Tu nombre</label>
+          <input id="rs-name" name="name" required maxlength="40" placeholder="Ej. Mariana" />
+          <label for="rs-goal">¿Qué quieres lograr?</label>
+          <select id="rs-goal" name="goal"><option>Bajar de peso</option><option>Ganar músculo</option><option>Mejorar condición física</option><option>Clases de HIIT o funcional</option><option>Entrenador personal</option></select>
+          <button class="rs-btn rs-wa" type="submit">Enviar por WhatsApp</button>
+          <small>Se abre WhatsApp con tu mensaje listo. El juego no guarda tus datos.</small>
+        </form>
+        <div class="rs-row">
+          ${won ? '<a class="rs-btn rs-primary" href="https://bacalarjunglegym.com/" target="_blank" rel="noopener">Visita bacalarjunglegym.com</a>' : ''}
+          <button class="rs-btn rs-ghost" id="rs-again">Seguir en la sala</button>
+        </div>
+      </div>`;
+    this.el.className = 'show';
+    document.exitPointerLock?.();
+    const form = this.el.querySelector<HTMLFormElement>('#rs-form')!;
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const text = [
+        `¡Hola Jungle Gym! Soy ${String(fd.get('name') ?? '').trim()}.`,
+        won ? `Gané ${title} con ${mine?.pts ?? 0} puntos. Mi código: ${code}.` : `Jugué ${title} (${mine?.pts ?? 0} puntos) y quiero mi primer día gratis.`,
+        `Quiero: ${fd.get('goal')}.`, '¿Cuándo puedo ir?',
+      ].join('\n');
+      const url = leadUrl(text);
+      const a = document.createElement('a');
+      a.href = url; a.target = '_blank'; a.rel = 'noopener';
+      document.body.appendChild(a); a.click(); a.remove();
+      const done = document.createElement('p');
+      done.className = 'rs-sent';
+      done.innerHTML = `Si WhatsApp no se abrió, toca aquí: <a href="${esc(url)}" target="_blank" rel="noopener">abrir WhatsApp</a>`;
+      form.replaceWith(done);
+    });
+    this.el.querySelector('#rs-again')!.addEventListener('click', () => this.hide());
+  }
+
   showEnd(r: RoundResult) {
     const code = prizeCode();
     const ord = ['', '1º', '2º', '3º', '4º', '5º'][r.place] ?? `${r.place}º`;

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { RAPIER, GROUP_BOAT, GROUP_LAND_VEHICLE, GROUP_PLAYER, GROUP_STATIC, GROUP_WATERWALL, groups, type Physics } from '../physics/physics';
 import type { VehicleModel } from './models';
 
-export interface Controls { throttle: number; steer: number; handbrake: boolean }
+export interface Controls { throttle: number; steer: number; handbrake: boolean; boost?: boolean }
 
 export interface CameraSpec {
   chaseDist: number;
@@ -176,11 +176,14 @@ export class Car extends Vehicle {
     const s = this.spec;
     const { throttle, steer, handbrake } = this.controls;
     const v = this.forwardSpeed();
-    const vmax = s.maxKmh / 3.6;
+    // turbo: stronger engine and higher top speed while the charge lasts
+    this.boosting = !!this.controls.boost && this.turbo > 0.02 && throttle > 0.05;
+    this.turbo = Math.max(0, Math.min(1, this.turbo + (this.boosting ? -h / 2.6 : h / 8)));
+    const vmax = (s.maxKmh / 3.6) * (this.boosting ? 1.25 : 1);
     let force = 0, brake = 0;
     if (throttle > 0.05) {
       if (v < -0.8) brake = s.brakeForce * throttle;
-      else force = s.engineForce * throttle * Math.max(0, 1 - (v / vmax) ** 2);
+      else force = s.engineForce * (this.boosting ? 1.9 : 1) * throttle * Math.max(0, 1 - (v / vmax) ** 2);
     } else if (throttle < -0.05) {
       if (v > 0.8) brake = s.brakeForce * -throttle;
       else force = s.reverseForce * throttle * Math.max(0, 1 - (v / (vmax * 0.3)) ** 2);
@@ -259,6 +262,10 @@ export class Car extends Vehicle {
       this.body.applyImpulse({ x: -lv.x * k * s.mass / 3, y: 0, z: -lv.z * k * s.mass / 3 }, true);
     }
   }
+
+  /** turbo charge 0..1 and whether it is firing */
+  turbo = 1;
+  boosting = false;
 
   /** 0..1 tire slip for sound and effects */
   slip = 0;

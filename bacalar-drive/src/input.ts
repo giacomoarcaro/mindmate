@@ -9,7 +9,7 @@ export class Input {
   gamepad: Gamepad | null = null;
   private padPrev: boolean[] = [];
   /** analog values from the on-screen touch controls */
-  readonly touch = { active: false, steer: 0, throttle: 0, handbrake: false };
+  readonly touch = { active: false, steer: 0, throttle: 0, handbrake: false, boost: false };
 
   constructor(private el: HTMLElement) {
     window.addEventListener('keydown', (e) => {
@@ -94,6 +94,7 @@ export class Input {
       if (Math.abs(ax) > 0.12) steer = ax;
       if (gp.buttons[0]?.pressed) handbrake = true;
     }
-    return { throttle, steer, handbrake };
+    const boost = this.isDown('ShiftLeft') || this.isDown('ShiftRight') || (t.active && t.boost) || !!gp?.buttons[5]?.pressed;
+    return { throttle, steer, handbrake, boost };
   }
 }

@@ -103,6 +103,30 @@ export class Sound {
     }
     this.screech!.gain.gain.setTargetAtTime(Math.min(0.22, slip * 0.25), t, 0.05);
     this.rain!.gain.gain.setTargetAtTime(rain * 0.12, t, 0.5);
+    this.tickMusic();
+  }
+
+  // ---- music: a small synthesized loop, faster when the round is about to end ----
+  private music = { on: false, next: 0, step: 0, bpm: 112 };
+  setMusic(on: boolean, bpm = 112) { this.music.on = on; this.music.bpm = bpm; }
+
+  private tickMusic() {
+    const ctx = this.ctx, m = this.music;
+    if (!ctx || !m.on || this.muted) return;
+    const spb = 60 / m.bpm / 4;
+    if (m.next < ctx.currentTime) m.next = ctx.currentTime + 0.05;
+    const roots = [110, 87.31, 130.81, 98];             // Am F C G
+    const arp = [2, 2.378, 3, 4, 3, 2.378, 3, 2];
+    while (m.next < ctx.currentTime + 0.25) {
+      const s = m.step, t = m.next, root = roots[Math.floor(s / 16) % 4];
+      if (s % 8 === 0) this.tone(120, 'sine', t, 0.14, 0.16, 45);                 // kick
+      if (s % 8 === 4) this.noise(t, 0.09, 0.05, 1800, 'bandpass');               // snare
+      if (s % 2 === 1) this.noise(t, 0.03, 0.02, 7000, 'highpass');               // hat
+      if (s % 4 === 0 || s % 16 === 6) this.tone(root, 'triangle', t, 0.2, 0.09); // bass
+      if (s % 2 === 0) this.tone(root * arp[(s / 2) % 8], 'square', t, 0.1, 0.018); // marimba-like arp
+      m.next += spb;
+      m.step = (s + 1) % 64;
+    }
   }
 
   private env(node: AudioParam, t: number, peak: number, attack: number, decay: number) {

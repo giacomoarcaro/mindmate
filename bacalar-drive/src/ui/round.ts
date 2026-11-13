@@ -38,6 +38,10 @@ export class RoundScreens {
   onRestart: () => void = () => undefined;
   /** join a multiplayer room: 'quick' picks a public room, otherwise the given code */
   onJoin: (name: string, code: string | 'quick') => void = () => undefined;
+  /** check the weekly gym code; resolves true when it unlocked the golden Jeep */
+  onRedeem: (code: string) => Promise<boolean> = async () => false;
+  onPartyAgain: () => void = () => undefined;
+  onShare: () => void = () => undefined;
 
   constructor() {
     this.el = document.createElement('div');
@@ -48,7 +52,7 @@ export class RoundScreens {
   hide() { this.el.className = ''; this.el.innerHTML = ''; }
   get visible() { return this.el.classList.contains('show'); }
 
-  showStart(rivals: string[], meters: number, best: number | null, touch: boolean, multiplayer = false, invite = '') {
+  showStart(rivals: string[], meters: number, best: number | null, touch: boolean, multiplayer = false, invite = '', opts: { close?: boolean; gold?: boolean } = {}) {
     const logo = drawLogoWide(400).toDataURL();
     this.el.innerHTML = `
       <div class="rs-card">
@@ -61,7 +65,15 @@ export class RoundScreens {
           <li>Bonus: recoge a quien pide <b>¡AL GYM!</b> y atropella al resto para sumar puntos.</li>
         </ul>
         <p class="rs-keys">${touch ? 'Palanca para girar · GAS y FRENO a la derecha' : 'WASD o flechas · Espacio freno de mano · C cámara · G claxon'}</p>
-        <button class="rs-btn rs-primary" id="rs-start">${multiplayer ? 'Carrera contra bots' : '¡A jugar!'}</button>
+        <div class="rs-row">
+          ${opts.close ? '<button class="rs-btn rs-primary" id="rs-close">Seguir jugando</button>' : ''}
+          <button class="rs-btn ${opts.close ? 'rs-ghost' : 'rs-primary'}" id="rs-start">${multiplayer ? 'Carrera contra bots' : '¡A jugar!'}</button>
+        </div>
+        <form class="rs-form rs-codeform" id="rs-redeem">
+          <p class="rs-form-title">${opts.gold ? 'Jeep dorado desbloqueado' : 'Código del gym'}</p>
+          ${opts.gold ? '' : `<div class="rs-code-row"><input id="rs-gymcode" maxlength="5" placeholder="XXXXX" autocapitalize="characters" autocomplete="off" /><button class="rs-btn rs-ghost" type="submit">Canjear</button></div>
+          <small id="rs-redeem-msg">Pasa por el Jungle Gym: el código de la semana está a la vista y desbloquea el Jeep dorado.</small>`}
+        </form>
         ${multiplayer ? `
         <form class="rs-form rs-mp" id="rs-mp">
           <p class="rs-form-title">${invite ? `Te invitaron a la sala ${esc(invite)}` : 'Jugar con amigos'}</p>
@@ -81,6 +93,18 @@ export class RoundScreens {
       </div>`;
     this.el.className = 'show';
     this.el.querySelector('#rs-start')!.addEventListener('click', () => { this.hide(); this.onStart(); });
+    this.el.querySelector('#rs-close')?.addEventListener('click', () => this.hide());
+    const redeem = this.el.querySelector<HTMLFormElement>('#rs-redeem')!;
+    redeem.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const input = redeem.querySelector<HTMLInputElement>('#rs-gymcode');
+      const msg = redeem.querySelector<HTMLElement>('#rs-redeem-msg');
+      if (!input || !msg) return;
+      msg.textContent = 'Comprobando…';
+      void this.onRedeem(input.value.toUpperCase().trim()).then((ok) => {
+        msg.textContent = ok ? '¡Listo! Tu Jeep ahora es dorado.' : 'Ese código no es el de esta semana.';
+      });
+    });
     const mp = this.el.querySelector<HTMLFormElement>('#rs-mp');
     if (mp) {
       const nick = mp.querySelector<HTMLInputElement>('#rs-nick')!;
@@ -99,7 +123,7 @@ export class RoundScreens {
   }
 
   /** Ranking of a party round, with the same WhatsApp lead form. */
-  showParty(title: string, rows: { name: string; pts: number; me: boolean }[], won: boolean) {
+  showParty(title: string, rows: { name: string; pts: number; me: boolean }[], won: boolean, extra: { board?: Promise<{ name: string; pts: number }[]>; daily?: string; unlocked?: string } = {}) {
     const code = prizeCode();
     const mine = rows.find((r) => r.me);
     const place = rows.findIndex((r) => r.me) + 1;
@@ -108,7 +132,11 @@ export class RoundScreens {
         <h1>${won ? '¡Ganaste!' : `Quedaste ${place}º de ${rows.length}`}</h1>
         <p class="rs-lead">${esc(title)}${won ? `<br>Tu premio: <b>${BRAND.offer.toLowerCase()}</b> en el Jungle Gym.` : '<br>Igual puedes probar el gym: el primer día es gratis.'}</p>
         ${won ? `<div class="rs-code">Tu código <b>${code}</b></div>` : ''}
+        ${extra.unlocked ? `<p class="rs-unlock">${esc(extra.unlocked)}</p>` : ''}
+        ${extra.daily ? `<p class="rs-daily">${esc(extra.daily)}</p>` : ''}
+        <div class="rs-row"><button class="rs-btn rs-primary" id="rs-again">Jugar otra vez</button><button class="rs-btn rs-ghost" id="rs-share">Compartir</button></div>
         <ol class="rs-rank">${rows.slice(0, 8).map((r, i) => `<li class="${r.me ? 'me' : ''}"><span>${i + 1}. ${esc(r.name)}</span><b>${r.pts}</b></li>`).join('')}</ol>
+        <div class="rs-board" id="rs-board"></div>
         <form class="rs-form" id="rs-form" autocomplete="on">
           <p class="rs-form-title">${won ? 'Reclama tu día gratis por WhatsApp' : 'Reserva tu día gratis por WhatsApp'}</p>
           <label for="rs-name">Tu nombre</label>
@@ -118,10 +146,7 @@ export class RoundScreens {
           <button class="rs-btn rs-wa" type="submit">Enviar por WhatsApp</button>
           <small>Se abre WhatsApp con tu mensaje listo. El juego no guarda tus datos.</small>
         </form>
-        <div class="rs-row">
-          ${won ? '<a class="rs-btn rs-primary" href="https://bacalarjunglegym.com/" target="_blank" rel="noopener">Visita bacalarjunglegym.com</a>' : ''}
-          <button class="rs-btn rs-ghost" id="rs-again">Seguir en la sala</button>
-        </div>
+        <div class="rs-row"><a class="rs-btn rs-ghost" href="https://bacalarjunglegym.com/" target="_blank" rel="noopener">bacalarjunglegym.com</a></div>
       </div>`;
     this.el.className = 'show';
     document.exitPointerLock?.();
@@ -143,7 +168,13 @@ export class RoundScreens {
       done.innerHTML = `Si WhatsApp no se abrió, toca aquí: <a href="${esc(url)}" target="_blank" rel="noopener">abrir WhatsApp</a>`;
       form.replaceWith(done);
     });
-    this.el.querySelector('#rs-again')!.addEventListener('click', () => this.hide());
+    this.el.querySelector('#rs-again')!.addEventListener('click', () => { this.hide(); this.onPartyAgain(); });
+    this.el.querySelector('#rs-share')!.addEventListener('click', () => this.onShare());
+    void extra.board?.then((top) => {
+      const el = this.el.querySelector('#rs-board');
+      if (!el || !top.length) return;
+      el.innerHTML = `<p class="rs-form-title">Top de la semana en Bacalar</p><ol class="rs-rank">${top.slice(0, 5).map((r, i) => `<li><span>${i + 1}. ${esc(r.name)}</span><b>${r.pts}</b></li>`).join('')}</ol><small>El primero de la semana gana un premio en el gym.</small>`;
+    }).catch(() => undefined);
   }
 
   showEnd(r: RoundResult) {

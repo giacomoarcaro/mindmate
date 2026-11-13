@@ -36,6 +36,8 @@ import { RoundScreens, fmtTime } from './ui/round';
 import { Race } from './gym/race';
 import { Net, PHRASES, randomRoom, serverUrl } from './net/net';
 import { Mancuerna } from './gym/mancuerna';
+import { Dust, buzz, shareCard } from './gym/juice';
+import { drawLogoWide } from './gym/brand';
 import { figure, type Kind } from './gym/people';
 
 type Progress = (msg: string) => Promise<void>;
@@ -85,6 +87,12 @@ export class Game {
   race!: Race;
   net: Net | null = null;
   mancuerna: Mancuerna | null = null;
+  dust = new Dust();
+  /** real seconds of slow motion left (after grabbing or losing the dumbbell) */
+  private slowmo = 0;
+  private rounds = 0;
+  private gold = false;
+  private lastResult = { place: 0, pts: 0 };
   private quickN = 1;
   private round = { phase: 'idle' as 'idle' | 'countdown' | 'racing' | 'done', countdown: 0, time: 0, socios: 0, hits: 0, startPuntos: 0, lastBeep: 0 };
   private best: number | null = null;
@@ -163,7 +171,10 @@ export class Game {
     this.hud = new Hud();
     if (this.isTouch) {
       this.touch = new TouchControls(this.input, this.canvas);
-      this.touch.onFoot = () => !this.player?.active;
+      this.touch.onMenu = () => this.openMenu();
+    }
+    document.getElementById('hud-menu')?.addEventListener('click', () => this.openMenu());
+    if (this.isTouch) {
       this.hud.setHelp(false);
     }
     this.hud.setBrand(drawLogo(128).toDataURL(), `${BRAND.offer} · WhatsApp|Día gratis · WhatsApp`, whatsappUrl());
@@ -201,14 +212,27 @@ export class Game {
       this.screens.onJoin = (name, code) => this.joinRoom(name, code);
       this.mancuerna = new Mancuerna(this.net, this.race, w.field, w.roads, this.hud, this.sound, this.minimap, this.spawn);
       this.scene.add(this.mancuerna.group);
-      this.mancuerna.onOver = (rows, won) => this.screens.showParty('La Mancuerna de Oro', rows, won);
+      this.mancuerna.onEvent = (kind) => {
+        if (kind === 'start') return;
+        this.slowmo = 0.45;
+        this.rig.addShake(kind === 'grab' ? 0.35 : 0.7);
+        buzz(kind === 'grab' ? [30, 40, 60] : 160);
+      };
+      this.mancuerna.onOver = (rows, won) => this.partyOver(rows, won);
+      this.screens.onPartyAgain = () => { if (this.net?.status === 'online' && !this.mancuerna?.active()) this.mancuerna?.start(); };
+      this.screens.onShare = () => void this.share();
+      this.screens.onRedeem = (code) => this.redeem(code);
       this.net.onChat = (name, text) => this.hud.message(`${name}: ${text}`, 3);
       this.net.onStatus = (s) => {
         if (s === 'full') {
           if (this.net!.room.startsWith('PUBLICA')) { this.quickN++; this.net!.join(`PUBLICA${this.quickN}`, this.nick, 0); }
           else this.hud.message('La sala está llena (8 jugadores)', 5);
         } else if (s === 'reconnecting') this.hud.message('Conexión perdida, reconectando…', 4);
-        else if (s === 'online') this.hud.message(`Sala ${this.net!.room}: comparte el enlace para invitar`, 5);
+        else if (s === 'online') {
+          this.hud.message(this.net!.room.startsWith('PUBLICA') ? 'Toma la mancuerna de oro y no la sueltes' : `Sala ${this.net!.room}: comparte el enlace para invitar`, 5);
+          // straight into a round: if none is running, start one
+          setTimeout(() => { if (this.net?.status === 'online' && !this.mancuerna?.active() && !this.screens.visible) this.mancuerna?.start(); }, 1200);
+        }
       };
     }
     try { this.best = Number(localStorage.getItem('bjg-best')) || null; } catch { /* storage unavailable */ }
@@ -340,6 +364,76 @@ export class Game {
     }
   }
 
+  /** Server address for plain HTTP calls (board, code). */
+  private httpBase() { return (serverUrl() ?? '').replace(/^ws/, 'http'); }
+
+  private openMenu() {
+    const invite = this.net?.status === 'online' && !this.net.room.startsWith('PUBLICA') ? this.net.room : '';
+    this.screens.showStart(this.race.rivals.map((r) => r.name), this.race.routeLength, this.best, this.isTouch, !!this.net, invite, { close: true, gold: this.gold });
+  }
+
+  /** Weekly gym code: unlocks the golden Jeep. */
+  private async redeem(code: string) {
+    try {
+      const res = await fetch(`${this.httpBase()}/canjear?c=${encodeURIComponent(code)}`);
+      const ok = ((await res.json()) as { ok: boolean }).ok === true;
+      if (ok) {
+        this.gold = true;
+        try { localStorage.setItem('bjg-gold', '1'); } catch { /* storage unavailable */ }
+        this.applyGold();
+        this.sound.reward();
+      }
+      return ok;
+    } catch { return false; }
+  }
+
+  private applyGold() {
+    const lime = new THREE.Color(BRAND.lime).getHexString();
+    this.jeep.model.root.traverse((o) => {
+      const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+      if (m?.color && m.color.getHexString() === lime) { m.color.set('#ffc93c'); m.metalness = 0.9; m.roughness = 0.22; }
+    });
+  }
+
+  /** End of a party round: unlocks, daily goal, weekly board, ranking screen. */
+  private partyOver(rows: { name: string; pts: number; me: boolean }[], won: boolean) {
+    const mine = rows.find((r) => r.me)?.pts ?? 0;
+    this.lastResult = { place: rows.findIndex((r) => r.me) + 1, pts: mine };
+    this.rounds++;
+    let unlocked = '';
+    if (this.rounds === 3) unlocked = '¡Desbloqueaste la moto deportiva! Cámbiala con "Vehículo".';
+    const today = new Date().toISOString().slice(0, 10);
+    let daily = { d: today, pts: 0 };
+    try {
+      localStorage.setItem('bjg-rounds', String(this.rounds));
+      const saved = JSON.parse(localStorage.getItem('bjg-daily') ?? 'null') as typeof daily | null;
+      if (saved?.d === today) daily = saved;
+      daily.pts += mine;
+      localStorage.setItem('bjg-daily', JSON.stringify(daily));
+    } catch { /* storage unavailable */ }
+    const goal = 600;
+    const dailyTxt = daily.pts >= goal ? `Reto de hoy cumplido: ${daily.pts} puntos` : `Reto de hoy: ${daily.pts} de ${goal} puntos`;
+    const board = fetch(`${this.httpBase()}/board`).then((r) => r.json() as Promise<{ top: { name: string; pts: number }[] }>).then((b) => b.top);
+    buzz(won ? [60, 60, 60, 60, 200] : 120);
+    this.screens.showParty('La Mancuerna de Oro', rows, won, { board, daily: dailyTxt, unlocked });
+  }
+
+  /** Share the last result: image through the system share sheet, or a WhatsApp text. */
+  private async share() {
+    const url = `${location.origin}${location.pathname}`;
+    const { place, pts } = this.lastResult;
+    const text = `Quedé ${place}º con ${pts} puntos en La Mancuerna de Oro del Bacalar Jungle Gym. ¿Me ganas? ${url}`;
+    try {
+      const card = shareCard(drawLogoWide(700), `Quedé ${place}º en La Mancuerna de Oro`, String(pts), 'puntos · Bacalar Jungle Gym', url);
+      const blob = await new Promise<Blob | null>((res) => card.toBlob(res, 'image/png'));
+      const file = blob ? new File([blob], 'jungle-gym.png', { type: 'image/png' }) : null;
+      if (file && navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], text }); return; }
+    } catch { /* fall through to the link */ }
+    const a = document.createElement('a');
+    a.href = `https://wa.me/?text=${encodeURIComponent(text)}`; a.target = '_blank'; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+
   private findSpawn() {
     const roads = this.world.roads;
     // Start in the historic center, on the street in front of the BACALAR letters, facing them.
@@ -375,8 +469,21 @@ export class Game {
   }
 
   start() {
-    const invite = (new URLSearchParams(location.search).get('sala') ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
-    this.screens.showStart(this.race.rivals.map((r) => r.name), this.race.routeLength, this.best, this.isTouch, !!this.net, invite);
+    const params = new URLSearchParams(location.search);
+    const invite = (params.get('sala') ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+    try { this.rounds = Number(localStorage.getItem('bjg-rounds')) || 0; this.gold = localStorage.getItem('bjg-gold') === '1'; } catch { /* storage unavailable */ }
+    if (this.gold) this.applyGold();
+    this.scene.add(this.dust.points);
+    const menu = () => this.screens.showStart(this.race.rivals.map((r) => r.name), this.race.routeLength, this.best, this.isTouch, !!this.net, invite, { gold: this.gold });
+    if (this.net && !params.has('menu')) {
+      // no menus: straight into a room and a round; the menu stays one tap away
+      let nick = '';
+      try { nick = localStorage.getItem('bjg-nick') ?? ''; } catch { /* storage unavailable */ }
+      if (!nick) { nick = `Jugador${10 + Math.floor(Math.random() * 90)}`; }
+      this.joinRoom(nick, invite || 'quick');
+      this.hud.showToast('La Mancuerna de Oro', this.isTouch ? 'desliza para girar · tómala y huye' : 'flechas o WASD · Shift turbo · tómala y huye', 4.5);
+      setTimeout(() => { if (this.net && this.net.status !== 'online') { this.net.leave(); menu(); } }, 7000);
+    } else menu();
     this.renderer.setAnimationLoop((t) => this.frame(t));
   }
 
@@ -401,6 +508,13 @@ export class Game {
       this.hud.message(this.atmosphere.rainTarget ? 'Lluvia' : 'Sin lluvia');
     }
     if (input.wasPressed('KeyG')) this.sound.horn();
+    if (input.wasPressed('Escape')) { if (this.screens.visible) this.screens.hide(); else this.openMenu(); }
+    if (input.wasPressed('KeyV') && !this.droneActive) {
+      const list: Vehicle[] = [this.jeep, this.moto, ...(this.rounds >= 3 ? [this.bike] : [])];
+      const next = list[(list.indexOf(p.active as Vehicle) + 1) % list.length];
+      const err = p.summon(next);
+      if (err) this.hud.message(err); else { this.hud.showToast(next.name, this.rounds < 3 ? `juega ${3 - this.rounds} rondas más para la moto deportiva` : ''); this.rig.snap(); this.riders = this.riders.slice(0, next.seats.length); this.seatRiders(); }
+    }
     if (this.net?.status === 'online' && input.wasPressed('Enter') && !this.mancuerna?.active() && !this.screens.visible) this.mancuerna?.start();
     if (this.net?.status === 'online') {
       ['Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0'].forEach((code, i) => {
@@ -408,7 +522,7 @@ export class Game {
       });
     }
     if (input.wasPressed('KeyM')) this.hud.message(this.sound.toggleMute() ? 'Sonido apagado' : 'Sonido encendido');
-    const keys: [string, Vehicle | undefined][] = [['Digit1', this.jeep], ['Digit2', this.moto], ['Digit3', this.boat], ['Digit4', this.bike]];
+    const keys: [string, Vehicle | undefined][] = [['Digit1', this.jeep], ['Digit2', this.moto], ['Digit3', this.boat], ['Digit4', this.rounds >= 3 ? this.bike : undefined]];
     for (const [code, v] of keys) {
       if (v && input.wasPressed(code)) {
         const err = p.summon(v);
@@ -483,6 +597,8 @@ export class Game {
     if (this.comboTimer <= 0) this.combo = 0;
     for (const h of ev.hits) {
       this.sound.hit(Math.min(1, h.speed / 20));
+      this.rig.addShake(0.22);
+      buzz(35);
       if (h.gymGoer) {
         this.hud.showToast('¡Ese iba al gym!', 'sin puntos · frena para que suban', 2.2);
         continue;
@@ -543,7 +659,7 @@ export class Game {
       const slip = v.kind === 'land' ? Math.max(v.controls.handbrake && kmh > 15 ? 1 : 0, Math.min(1, (lateral - 2.5) / 5)) : 0;
       this.sound.update(kind, Math.min(1, kmh / v.maxKmh), Math.max(0, v.controls.throttle), Math.max(0, slip), atm.rain);
       const drop = this.lastKmh - kmh;
-      if (drop > 18 && ev.hits.length === 0) this.sound.crash(Math.min(1, drop / 60));
+      if (drop > 18 && ev.hits.length === 0) { this.sound.crash(Math.min(1, drop / 60)); this.rig.addShake(Math.min(0.9, drop / 55)); buzz(90); }
     } else this.sound.update('none', 0, 0, 0, atm.rain);
     this.lastKmh = kmh;
   }
@@ -584,7 +700,9 @@ export class Game {
 
   private frame(now: number) {
     this.timer.update(now);
-    const dt = Math.min(this.timer.getDelta(), 0.05);
+    const raw = Math.min(this.timer.getDelta(), 0.05);
+    this.slowmo = Math.max(0, this.slowmo - raw);
+    const dt = raw * (this.slowmo > 0 ? 0.35 : 1);
     this.elapsed += dt;
     const input = this.input;
     input.pollGamepad();
@@ -617,6 +735,22 @@ export class Game {
     });
     for (const v of p.vehicles) v.syncVisual(this.elapsed);
     p.walker.sync(this.elapsed);
+
+    // juice: dust from sliding or boosting tires, turbo bar, view kick, music
+    const car = p.active instanceof Car ? p.active : null;
+    if (car) {
+      const sp = Math.abs(car.forwardSpeed());
+      if ((car.slip > 0.35 && sp > 4) || car.boosting) {
+        const back = new THREE.Vector3(0, 0, 1.5).applyQuaternion(car.quaternion()).add(car.position());
+        this.dust.emit(back.x, field.heightAt(back.x, -back.z) + 0.25, back.z);
+      }
+      if (car.boosting) this.rig.kick = Math.max(this.rig.kick, 9);
+      this.hud.setTurbo(car.turbo, car.boosting);
+    }
+    this.dust.update(dt);
+    if (this.touch) this.touch.autoGas = !!car && !holding && !this.droneActive && (this.mancuerna?.active() === true || this.round.phase === 'racing');
+    const party = this.net?.party;
+    this.sound.setMusic(this.mancuerna?.active() === true || this.round.phase === 'racing', party && party.phase === 'play' && party.left < 20 ? 148 : 112);
 
     // camera
     const groundAt = (x: number, z: number) => field.heightAt(x, -z);

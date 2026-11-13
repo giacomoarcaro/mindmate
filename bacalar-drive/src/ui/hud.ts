@@ -25,9 +25,11 @@ export class Hud {
       <div class="minimap" id="hud-minimap"></div>
       <canvas class="speedo" id="hud-speedo" width="340" height="340"></canvas>
       <div class="street" id="hud-street"></div>
+      <div class="turbo" id="hud-turbo"><i></i><span>TURBO</span></div>
       <div class="toast" id="hud-toast"></div>
       <div class="message panel" id="hud-msg"></div>
       <div class="help panel" id="hud-help"></div>
+      <button class="menu-btn" id="hud-menu">Menú · Esc</button>
       <div class="credit">Map data © OpenStreetMap contributors</div>`;
     this.info = document.getElementById('hud-info')!;
     this.speedo = document.getElementById('hud-speedo') as HTMLCanvasElement;
@@ -36,7 +38,7 @@ export class Hud {
     this.msg = document.getElementById('hud-msg')!;
     this.help = document.getElementById('hud-help')!;
     this.minimapHost = document.getElementById('hud-minimap')!;
-    this.setHelp(true);
+    this.setHelp(false);
   }
 
   setHelp(visible: boolean) {
@@ -44,12 +46,22 @@ export class Hud {
     this.help.innerHTML = `
       <b>Carrera:</b> llega primero al Jungle Gym (línea verde del mapa). Bonus: recoge a quien pide <b>¡AL GYM!</b> y atropella al resto.<br>
       <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / flechas manejar &nbsp; <kbd>Espacio</kbd> freno de mano<br>
-      <kbd>1</kbd> Jeep &nbsp; <kbd>2</kbd> Mototaxi &nbsp; <kbd>3</kbd> Lancha &nbsp; <kbd>4</kbd> Moto &nbsp; <kbd>E</kbd> subir / bajar<br>
+      <kbd>1</kbd> Jeep &nbsp; <kbd>2</kbd> Mototaxi &nbsp; <kbd>3</kbd> Lancha &nbsp; <kbd>4</kbd> Moto &nbsp; <kbd>V</kbd> cambiar &nbsp; <kbd>Shift</kbd> turbo &nbsp; <kbd>E</kbd> subir / bajar<br>
       <kbd>C</kbd> cámara &nbsp; <kbd>F</kbd> dron &nbsp; <kbd>R</kbd> reiniciar &nbsp; <kbd>T</kbd> adelantar hora &nbsp; <kbd>P</kbd> lluvia<br>
       <kbd>5</kbd>-<kbd>0</kbd> frases en sala &nbsp; <kbd>G</kbd> claxon &nbsp; <kbd>M</kbd> sonido &nbsp; <kbd>H</kbd> ocultar ayuda &nbsp; clic para mirar con el mouse`;
   }
 
   setInfo(html: string) { this.info.innerHTML = html; }
+
+  private lastTurbo = -1;
+  setTurbo(v: number, firing: boolean) {
+    const k = Math.round(v * 50);
+    if (k === this.lastTurbo && !firing) return;
+    this.lastTurbo = k;
+    const el = document.getElementById('hud-turbo')!;
+    (el.firstElementChild as HTMLElement).style.width = `${Math.round(v * 100)}%`;
+    el.classList.toggle('fire', firing);
+  }
 
   setBrand(logoDataUrl: string, ctaText: string, ctaUrl: string) {
     (document.getElementById('hud-logo') as HTMLImageElement).src = logoDataUrl;

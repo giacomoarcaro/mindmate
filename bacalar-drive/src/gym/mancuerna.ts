@@ -22,6 +22,7 @@ export class Mancuerna {
   private prevHolder = 0;
   private prevPhase: PartyState['phase'] = 'idle';
   private bots: Bot[] = [];
+  onEvent: (kind: 'start' | 'grab' | 'lost') => void = () => undefined;
   onOver: (rows: { name: string; pts: number; me: boolean }[], won: boolean) => void = () => undefined;
 
   constructor(private net: Net, private race: Race, private field: Field, private roads: RoadNetwork,
@@ -88,10 +89,10 @@ export class Mancuerna {
     if (g.phase === 'play') g.left = Math.max(0, g.left - dt);
 
     // events
-    if (g.phase === 'play' && this.prevPhase !== 'play') { this.hud.showToast('La Mancuerna de Oro', 'tómala y no la sueltes', 3); this.sound.beep(true); this.bots = []; }
+    if (g.phase === 'play' && this.prevPhase !== 'play') { this.hud.showToast('La Mancuerna de Oro', 'tómala y no la sueltes', 3); this.sound.beep(true); this.bots = []; this.onEvent('start'); }
     if (g.holder !== this.prevHolder && g.phase === 'play') {
-      if (g.holder === this.net.myId) { this.hud.showToast('¡Es tuya!', 'huye: sumas puntos mientras la lleves', 2.2); this.sound.reward(); }
-      else if (this.prevHolder === this.net.myId) { this.hud.showToast('¡Te la quitaron!', `la tiene ${this.nameOf(g.holder)}`, 2.2); this.sound.crash(0.4); }
+      if (g.holder === this.net.myId) { this.hud.showToast('¡Es tuya!', 'huye: sumas puntos mientras la lleves', 2.2); this.sound.reward(); this.onEvent('grab'); }
+      else if (this.prevHolder === this.net.myId) { this.hud.showToast('¡Te la quitaron!', `la tiene ${this.nameOf(g.holder)}`, 2.2); this.sound.crash(0.4); this.onEvent('lost'); }
       else if (g.holder) this.hud.message(`${this.nameOf(g.holder)} tiene la mancuerna`, 2);
     }
     if (g.phase === 'over' && this.prevPhase === 'play') {

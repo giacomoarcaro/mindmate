@@ -99,5 +99,22 @@ export class CameraRig {
       cam.lookAt(t.position);
       cam.up.set(0, 1, 0);
     }
+    // speed widens the view; portrait screens need a taller field of view
+    const base = cam.aspect < 1 ? 82 : 65;
+    const fov = base + Math.min(20, Math.abs(t.speed) * 0.42) + this.kick;
+    cam.fov += (fov - cam.fov) * Math.min(1, dt * 4);
+    cam.updateProjectionMatrix();
+    this.kick *= Math.exp(-dt * 3);
+    if (this.shake > 0.003) {
+      cam.position.x += (Math.random() - 0.5) * this.shake;
+      cam.position.y += (Math.random() - 0.5) * this.shake * 0.7;
+      cam.position.z += (Math.random() - 0.5) * this.shake;
+      this.shake *= Math.exp(-dt * 7);
+    }
   }
+
+  /** camera shake amplitude in meters, and a short field-of-view kick (turbo) */
+  shake = 0;
+  kick = 0;
+  addShake(a: number) { this.shake = Math.min(1.2, this.shake + a); }
 }

@@ -16,7 +16,7 @@
  */
 import { SITE } from './site';
 
-export interface Env { ROOMS: DurableObjectNamespace }
+export interface Env { ROOMS: DurableObjectNamespace; BOARD: DurableObjectNamespace; GYM_SECRET?: string }
 
 const MAX_PLAYERS = 8;
 const MAX_SPEED = 95;          // m/s, well above the fastest vehicle (190 km/h = 53 m/s)
@@ -40,6 +40,19 @@ export default {
     const url = new URL(req.url);
     const m = url.pathname.match(/^\/room\/([A-Z0-9]{3,10})$/);
     if (m) return env.ROOMS.get(env.ROOMS.idFromName(m[1])).fetch(req);
+    if (url.pathname === '/board/add') return new Response('not found', { status: 404, headers: cors });
+    if (url.pathname === '/board') return env.BOARD.get(env.BOARD.idFromName('global')).fetch(req);
+    // weekly code shown at the gym: staff open /codigo?k=SECRET and print it
+    if (url.pathname === '/codigo') {
+      if (!env.GYM_SECRET || url.searchParams.get('k') !== env.GYM_SECRET) return new Response('no autorizado', { status: 403 });
+      const code = await weeklyCode(env.GYM_SECRET, weekIndex());
+      return new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Código de la semana</title><body style="font-family:system-ui;text-align:center;background:#10201a;color:#fff;padding:40px 16px"><h1 style="color:#b4e23c">Código Jungle Gym de esta semana</h1><p style="font:900 96px monospace;color:#ffd23f;letter-spacing:.12em;margin:24px 0">${code}</p><p>Ponlo a la vista en el gym. En el juego: Menú, "Código del gym". Desbloquea el Jeep dorado.</p><p style="opacity:.7">Cambia cada lunes. No compartas esta dirección.</p>`, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+    }
+    if (url.pathname === '/canjear') {
+      const c = (url.searchParams.get('c') ?? '').toUpperCase().trim();
+      const ok = !!env.GYM_SECRET && c.length === 5 && c === await weeklyCode(env.GYM_SECRET, weekIndex());
+      return Response.json({ ok }, { headers: cors });
+    }
     // everything else is the game itself (static files bundled into the Worker)
     // the root is the game picker; the 3D game lives at /index.html
     const f = SITE[url.pathname === '/' ? (SITE['/juegos.html'] ? '/juegos.html' : '/index.html') : url.pathname];
@@ -50,12 +63,50 @@ export default {
   },
 };
 
+/** Weeks since 1970, starting on Mondays (UTC). */
+const weekIndex = () => Math.floor((Math.floor(Date.now() / 86400000) + 3) / 7);
+
+async function weeklyCode(secret: string, week: number) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sig = new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`semana-${week}`)));
+  const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let out = '';
+  for (let i = 0; i < 5; i++) out += abc[sig[i] % abc.length];
+  return out;
+}
+
+/** Weekly leaderboard: best round score per nickname. One global instance. */
+export class Board {
+  constructor(private state: DurableObjectState) {}
+
+  async fetch(req: Request): Promise<Response> {
+    const url = new URL(req.url);
+    const key = `w${weekIndex()}`;
+    const rows = ((await this.state.storage.get(key)) as Record<string, number> | undefined) ?? {};
+    if (url.pathname === '/board/add' && req.method === 'POST') {
+      // only rooms call this (internal fetch); scores come from the server-side round
+      const body = (await req.json()) as { name: string; pts: number }[];
+      for (const r of body) {
+        if (typeof r.name !== 'string' || typeof r.pts !== 'number' || r.pts <= 0) continue;
+        const name = r.name.slice(0, 14);
+        rows[name] = Math.max(rows[name] ?? 0, Math.round(r.pts));
+      }
+      // keep the table small
+      const top = Object.entries(rows).sort((a, b) => b[1] - a[1]).slice(0, 200);
+      await this.state.storage.put(key, Object.fromEntries(top));
+      return new Response('ok');
+    }
+    const top = Object.entries(rows).sort((a, b) => b[1] - a[1]).slice(0, 20).map(([name, pts]) => ({ name, pts }));
+    return Response.json({ week: weekIndex(), top }, { headers: { ...cors, 'Cache-Control': 'max-age=20' } });
+  }
+}
+
 export class Room {
   private nextId = 1;
   private bots = new Map<number, Ent>();
   private game: GameState = { phase: 'idle', ends: 0, holder: 0, since: 0, ball: [0, 0], scores: new Map(), lastTick: 0, lastSent: 0 };
 
-  constructor(private state: DurableObjectState) {
+  constructor(private state: DurableObjectState, private env: Env) {
     // ids must stay unique after the object wakes from hibernation
     for (const ws of state.getWebSockets()) {
       const meta = ws.deserializeAttachment() as Meta | null;
@@ -212,6 +263,11 @@ export class Room {
     this.game.phase = 'over';
     this.game.holder = 0;
     this.sendGame(now);
+    // real players' scores go to the weekly board (bots have ids from 90)
+    const rows = [...this.game.scores.entries()].filter(([id, s]) => id < BOT_ID && s.pts > 0).map(([, s]) => ({ name: s.name, pts: Math.round(s.pts) }));
+    if (rows.length) {
+      void this.env.BOARD.get(this.env.BOARD.idFromName('global')).fetch('https://board/board/add', { method: 'POST', body: JSON.stringify(rows) }).catch(() => undefined);
+    }
     for (const id of this.bots.keys()) this.broadcast({ t: 'leave', id });
     this.bots.clear();
   }

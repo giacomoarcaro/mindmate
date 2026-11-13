@@ -174,12 +174,22 @@ cd server && npm install && CLOUDFLARE_API_TOKEN=... npm run deploy
 
 ## Party mode: La Mancuerna de Oro
 
-In a room, Enter (or the "Mancuerna" touch button) starts a 2 minute round. A golden dumbbell
+Opening the game joins a public room and starts a round at once (auto nickname, no menu;
+`?menu` or the Menú button opens the menu, `?sala=CODE` joins a private room). A round lasts 2 minutes. A golden dumbbell
 appears on a street near the plaza; whoever carries it scores 10 points a second, and
 touching the carrier steals it (1.5 s of protection after each change). The server owns the
 dumbbell, the scores and the clock. With fewer than three people the host's client drives two
 bots along the street graph. The round ends with a ranking, a prize code for the winner and
 the WhatsApp lead form.
+
+Feel and retention: turbo (Shift / TURBO button) with a charge bar, camera shake and speed
+FOV, tire dust, a short slow motion and vibration when the dumbbell changes hands, a beat
+that speeds up in the last 20 seconds. On phones the car accelerates by itself and one thumb
+steers by sliding anywhere. The end screen shows the weekly Bacalar top (`/board`, best score
+per nickname, reset each week), a daily goal, a share button (image through the share sheet
+or a WhatsApp text) and "Jugar otra vez". The sport bike unlocks after 3 rounds. The gym
+shows a weekly code (staff page `/codigo?k=GYM_SECRET`, secret set with `wrangler secret put`);
+typing it in the menu (`/canjear`) turns the Jeep gold.
 
 ## Vehicles
 

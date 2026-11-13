@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#10201a">
+<title>Jungle Gym Arcade</title>
+<style>
+  :root { color-scheme: dark; --bg: #10201a; --card: #1a2a23; --ink: #f4f7ee; --mute: #a9b8ad; --lime: #b4e23c; --gold: #ffd23f; --char: #20252a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: radial-gradient(circle at 50% -10%, #235c43 0%, var(--bg) 55%); background-color: var(--bg); color: var(--ink);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif; min-height: 100vh;
+    padding-block: 24px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  main { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+  header { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+  header img { width: min(260px, 60vw); height: auto; filter: drop-shadow(0 10px 22px rgba(0,0,0,.5)); }
+  h1 { margin: 0; font: 900 clamp(28px, 6vw, 44px)/1.05 "Arial Black", Arial, sans-serif; color: var(--lime); letter-spacing: .02em; text-wrap: balance; }
+  header p { margin: 0; color: var(--mute); font-size: 16px; max-width: 46ch; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .game { display: flex; flex-direction: column; background: var(--card); border: 2px solid rgba(180,226,60,.25); border-radius: 18px; overflow: hidden; text-decoration: none; color: inherit; transition: transform .15s, border-color .15s; }
+  a.game:hover, a.game:focus-visible { transform: translateY(-4px); border-color: var(--lime); outline: none; }
+  .art { height: 150px; position: relative; overflow: hidden; }
+  .art svg { width: 100%; height: 100%; display: block; }
+  .body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .body h2 { margin: 0; font: 900 20px "Arial Black", Arial, sans-serif; }
+  .body p { margin: 0; color: var(--mute); font-size: 14px; line-height: 1.45; flex: 1; }
+  .tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tag { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; background: rgba(255,255,255,.08); }
+  .play { align-self: flex-start; margin-top: 6px; background: var(--gold); color: var(--char); font-weight: 900; padding: 9px 18px; border-radius: 999px; box-shadow: 0 4px 0 #c99a12; }
+  .soon { opacity: .6; }
+  .soon .play { background: transparent; color: var(--mute); box-shadow: none; border: 2px dashed rgba(255,255,255,.25); }
+  .best { font-size: 12px; color: var(--gold); font-weight: 700; min-height: 16px; }
+  footer { text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+  footer a.wa { background: #25d366; color: #fff; font-weight: 900; text-decoration: none; padding: 12px 22px; border-radius: 999px; }
+  footer small { color: var(--mute); }
+  footer small a { color: var(--lime); }
+  @media (prefers-reduced-motion: reduce) { .game { transition: none; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="./brand/jungle-gym-logo.png" alt="Jungle Gym Bacalar">
+    <h1>Jungle Gym Arcade</h1>
+    <p>Juega, gana y entrena. Los mejores se llevan su primer día gratis en el Bacalar Jungle Gym.</p>
+  </header>
+  <section class="grid" aria-label="Juegos">
+    <a class="game" href="./index.html">
+      <div class="art"><svg viewBox="0 0 320 150" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <rect width="320" height="150" fill="#1f8a8c"/><rect y="70" width="320" height="80" fill="#3f6a2c"/>
+        <path d="M110 150 L150 70 L170 70 L210 150Z" fill="#4a4a4c"/><path d="M158 150 L159.5 70 L160.5 70 L162 150Z" fill="#f2f0e6"/>
+        <rect x="20" y="52" width="60" height="38" fill="#e88fa8"/><rect x="240" y="46" width="64" height="44" fill="#e3b04b"/><rect x="92" y="60" width="30" height="24" fill="#58c4c6"/>
+        <rect x="136" y="104" width="48" height="22" rx="4" fill="#b4e23c"/><rect x="142" y="92" width="36" height="14" rx="3" fill="#20252a"/>
+        <circle cx="146" cy="128" r="7" fill="#151515"/><circle cx="174" cy="128" r="7" fill="#151515"/><rect x="136" y="112" width="48" height="4" fill="#ff5fa2"/>
+      </svg></div>
+      <div class="body">
+        <div class="tags"><span class="tag">3D</span><span class="tag">Multijugador</span></div>
+        <h2>Carrera al Jungle Gym</h2>
+        <p>Maneja por las calles reales de Bacalar en Jeep, mototaxi o moto. Corre contra bots o invita a tus amigos a una sala.</p>
+        <div class="best" id="best-drive"></div>
+        <span class="play">Jugar</span>
+      </div>
+    </a>
+    <a class="game" href="./vuelo.html">
+      <div class="art"><svg viewBox="0 0 320 150" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0e3b52"/><stop offset=".6" stop-color="#1f8a8c"/><stop offset="1" stop-color="#f6b26b"/></linearGradient></defs>
+        <rect width="320" height="150" fill="url(#s)"/>
+        <g fill="#20252a"><rect x="200" y="0" width="44" height="46" rx="6"/><rect x="200" y="104" width="44" height="46" rx="6"/></g>
+        <rect x="195" y="38" width="54" height="14" rx="6" fill="#b4e23c"/><rect x="195" y="98" width="54" height="14" rx="6" fill="#b4e23c"/>
+        <ellipse cx="110" cy="76" rx="20" ry="16" fill="#1b2024"/><ellipse cx="118" cy="82" rx="11" ry="9" fill="#fdf6d8"/>
+        <path d="M124 68 Q152 62 154 78 Q142 86 125 81Z" fill="#ffd23f"/><circle cx="119" cy="70" r="5" fill="#7fe0d8"/><circle cx="120" cy="70" r="2.4" fill="#111"/>
+        <path d="M96 62 A17 17 0 0 1 122 60" stroke="#b4e23c" stroke-width="4" fill="none"/>
+      </svg></div>
+      <div class="body">
+        <div class="tags"><span class="tag">Un botón</span><span class="tag">Rápido</span></div>
+        <h2>Vuelo Jungle</h2>
+        <p>Un tucán con su banda del gym. Toca para aletear y pasa entre las columnas de discos. Llega a 10 y gana un día gratis.</p>
+        <div class="best" id="best-vuelo"></div>
+        <span class="play">Jugar</span>
+      </div>
+    </a>
+    <div class="game soon">
+      <div class="art"><svg viewBox="0 0 320 150" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <rect width="320" height="150" fill="#2b1d4a"/><g fill="#ffd23f"><rect x="110" y="66" width="100" height="18" rx="6"/><rect x="92" y="46" width="22" height="58" rx="6"/><rect x="206" y="46" width="22" height="58" rx="6"/><rect x="78" y="56" width="14" height="38" rx="5"/><rect x="228" y="56" width="14" height="38" rx="5"/></g>
+      </svg></div>
+      <div class="body">
+        <div class="tags"><span class="tag">Multijugador</span></div>
+        <h2>La Mancuerna de Oro</h2>
+        <p>Una mancuerna dorada en el mapa: quien la lleva suma puntos, los demás se la quitan con un golpe.</p>
+        <span class="play">Próximamente</span>
+      </div>
+    </div>
+    <div class="game soon">
+      <div class="art"><svg viewBox="0 0 320 150" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <rect width="320" height="150" fill="#b4e23c"/><path d="M130 40 L190 40 L180 126 L140 126Z" fill="#ff8fb8"/><rect x="124" y="32" width="72" height="12" rx="5" fill="#20252a"/><rect x="166" y="8" width="6" height="40" fill="#20252a" transform="rotate(14 169 28)"/>
+      </svg></div>
+      <div class="body">
+        <div class="tags"><span class="tag">Multijugador</span></div>
+        <h2>Reparto de Licuados</h2>
+        <p>Pedidos por todo Bacalar. Gana quien entregue más licuados antes de que se acabe el tiempo.</p>
+        <span class="play">Próximamente</span>
+      </div>
+    </div>
+  </section>
+  <footer>
+    <a class="wa" href="https://wa.me/393661512335?text=%C2%A1Hola%20Jungle%20Gym!%20Vengo%20del%20arcade%20y%20quiero%20mi%20primer%20d%C3%ADa%20gratis." target="_blank" rel="noopener">Reserva tu día gratis por WhatsApp</a>
+    <small><a href="https://bacalarjunglegym.com/" target="_blank" rel="noopener">bacalarjunglegym.com</a></small>
+  </footer>
+</main>
+<script>
+  try {
+    var b = Number(localStorage.getItem('bjg-best')), v = Number(localStorage.getItem('vuelo-jungle-best'));
+    if (b) { var m = Math.floor(b / 60); document.getElementById('best-drive').textContent = 'Tu récord: ' + m + ':' + (b - m * 60).toFixed(1).padStart(4, '0'); }
+    if (v) document.getElementById('best-vuelo').textContent = 'Tu récord: ' + v + ' puntos';
+  } catch (e) { /* storage unavailable */ }
+</script>
+</body>
+</html>

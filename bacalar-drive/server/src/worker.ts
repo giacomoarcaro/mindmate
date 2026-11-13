@@ -29,7 +29,8 @@ export default {
     const m = url.pathname.match(/^\/room\/([A-Z0-9]{3,10})$/);
     if (m) return env.ROOMS.get(env.ROOMS.idFromName(m[1])).fetch(req);
     // everything else is the game itself (static files bundled into the Worker)
-    const f = SITE[url.pathname === '/' ? '/index.html' : url.pathname];
+    // the root is the game picker; the 3D game lives at /index.html
+    const f = SITE[url.pathname === '/' ? (SITE['/juegos.html'] ? '/juegos.html' : '/index.html') : url.pathname];
     if (!f) return new Response('not found', { status: 404, headers: cors });
     return new Response(f.body, {
       headers: { 'Content-Type': f.type, 'Cache-Control': f.hashed ? 'public, max-age=31536000, immutable' : 'public, max-age=300', ...cors },
